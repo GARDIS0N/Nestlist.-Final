@@ -1,0 +1,6 @@
+{
+  "name": "NestList",
+  "description": "Premium real estate listing platform with high fidelity interactive workflow, role-based roleplay simulation, listings directory, and multi-tenant dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
