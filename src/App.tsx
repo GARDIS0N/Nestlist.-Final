@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { getApiUrl } from './utils/apiHelper';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -186,7 +187,7 @@ export default function App() {
 
   // FULL-STACK SERVER INTEGRATION HARNESS (with loading tracking)
   const refreshServerListings = () => {
-    fetch('/api/listings')
+    fetch(getApiUrl('/api/listings'))
       .then(res => res.json())
       .then(data => {
         if (data && data.success && data.listings) {
@@ -204,7 +205,7 @@ export default function App() {
     // Identity auto-login from local token on layout mount
     const token = localStorage.getItem('nestlist_token');
     if (token && token !== "MOCK_TOKEN") {
-      fetch('/api/auth/me', {
+      fetch(getApiUrl('/api/auth/me'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -369,7 +370,7 @@ export default function App() {
 
     // Save on real express full-stack server backend
     const token = localStorage.getItem('nestlist_token');
-    fetch('/api/listings', {
+    fetch(getApiUrl('/api/listings'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

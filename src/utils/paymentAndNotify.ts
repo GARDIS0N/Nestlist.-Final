@@ -1,4 +1,5 @@
 import emailjs from '@emailjs/browser';
+import { getApiUrl } from './apiHelper';
 
 /**
  * Retrieves the exact required listing fee in Kenyan Shillings (KSh)
@@ -29,7 +30,7 @@ export async function sendSMSNotification(to: string, message: string): Promise<
         ? '+' + to 
         : to;
 
-    const res = await fetch('/api/sms/send', {
+    const res = await fetch(getApiUrl('/api/sms/send'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: formattedPhone, message })
@@ -116,7 +117,7 @@ export async function checkExpiredListings(
     for (const listing of updatedListings) {
       if (listing.status === 'expired') {
         try {
-          await fetch(`/api/listings/${listing.id}/status`, {
+          await fetch(getApiUrl(`/api/listings/${listing.id}/status`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'expired' })

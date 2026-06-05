@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '../utils/apiHelper';
 import { motion, AnimatePresence } from 'motion/react';
 import emailjs from '@emailjs/browser';
 import { getListingFee } from '../utils/paymentAndNotify';
@@ -208,7 +209,7 @@ export default function Dashboards({
   // Sync payments and active listings against in-memory backend
   const syncPaymentEngine = async () => {
     try {
-      const res = await fetch('/api/payments');
+      const res = await fetch(getApiUrl('/api/payments'));
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && data.payments) {
@@ -257,7 +258,7 @@ export default function Dashboards({
     
     // 2. Activate Listing in Express backend DB replica securely
     try {
-      await fetch(`/api/listings/${listingId}/activate`, {
+      await fetch(getApiUrl(`/api/listings/${listingId}/activate`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tracking_id: reference })
@@ -268,7 +269,7 @@ export default function Dashboards({
 
     // 3. Add transaction record to the database ledger so charts sync
     try {
-      await fetch('/api/payments/add', {
+      await fetch(getApiUrl('/api/payments/add'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -343,7 +344,7 @@ export default function Dashboards({
 
     try {
       const token = localStorage.getItem('nestlist_token');
-      const response = await fetch('/api/payments/mpesa/stkpush', {
+      const response = await fetch(getApiUrl('/api/payments/mpesa/stkpush'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -501,7 +502,7 @@ export default function Dashboards({
     if (!listing) return;
     
     // Call backend endpoint to register it as pending
-    fetch('/api/listings', {
+    fetch(getApiUrl('/api/listings'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(listing)
@@ -3211,7 +3212,7 @@ export default function Dashboards({
                         type="button"
                         onClick={async () => {
                           try {
-                            const res = await fetch('/api/payments/mpesa/simulate-success', {
+                            const res = await fetch(getApiUrl('/api/payments/mpesa/simulate-success'), {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ checkoutRequestID: stkReference })

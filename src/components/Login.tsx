@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getApiUrl } from '../utils/apiHelper';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LogIn, 
@@ -48,7 +49,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setStatusMessage("Connecting securely...");
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(getApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -98,7 +99,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setStatusMessage("Creating your secure profile...");
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(getApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -149,7 +150,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       const randomId = Math.floor(1000 + Math.random() * 9000);
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(getApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

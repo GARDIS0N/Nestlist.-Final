@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getApiUrl } from '../utils/apiHelper';
 import { motion } from 'motion/react';
 import { ShieldCheck, ArrowRight, CheckCircle2, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export default function PaymentSandboxVisualizer() {
     try {
       let response;
       if (success && listingId) {
-        response = await fetch(`/api/listings/${listingId}/activate`, {
+        response = await fetch(getApiUrl(`/api/listings/${listingId}/activate`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

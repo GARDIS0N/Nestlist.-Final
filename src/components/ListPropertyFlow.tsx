@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { getApiUrl } from '../utils/apiHelper';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X,
@@ -614,7 +615,7 @@ export default function ListPropertyFlow({
     const fee = getListingFee(createdListingData!.propertyType, bedrooms);
 
     try {
-      const response = await fetch('/api/payments/mpesa/stkpush', {
+      const response = await fetch(getApiUrl('/api/payments/mpesa/stkpush'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -659,7 +660,7 @@ export default function ListPropertyFlow({
 
     const checkPaymentStatus = async () => {
       try {
-        const res = await fetch(`/api/payments/mpesa/status/${checkoutId}`);
+        const res = await fetch(getApiUrl(`/api/payments/mpesa/status/${checkoutId}`));
         const data = await res.json();
         if (data && data.success) {
           if (data.status === 'success') {
@@ -694,7 +695,7 @@ export default function ListPropertyFlow({
   const handleTriggerManualSimulateSuccess = async () => {
     if (!checkoutId) return;
     try {
-      const res = await fetch('/api/payments/mpesa/simulate-success', {
+      const res = await fetch(getApiUrl('/api/payments/mpesa/simulate-success'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ checkoutRequestID: checkoutId })
