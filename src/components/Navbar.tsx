@@ -17,7 +17,9 @@ import {
   HelpCircle,
   Clock,
   ChevronRight,
-  Plus
+  Plus,
+  Menu,
+  X
 } from 'lucide-react';
 import { UserRole, Notification, Profile } from '../types';
 
@@ -51,6 +53,7 @@ export default function Navbar({
   setIsLoggedIn
 }: NavbarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Profile Form Edit state
   const [editName, setEditName] = useState(userProfile.fullName);
@@ -103,7 +106,7 @@ export default function Navbar({
           {/* Logo Brand */}
           <div 
             onClick={() => navigateTab('home')}
-            className="flex items-center gap-2 md:gap-3.5 cursor-pointer group active:scale-95 transition-all text-left"
+            className="flex items-center gap-2 md:gap-3.5 cursor-pointer group active:scale-95 transition-all text-left mr-4"
           >
             <div className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-violet-950/50 group-hover:scale-105 transition-transform duration-300">
               <Home className="w-4.5 h-4.5 sm:w-6 sm:h-6 text-white" />
@@ -119,23 +122,54 @@ export default function Navbar({
             </div>
           </div>
 
+          {/* Desktop Navigation Menu Links (Requirement 8) */}
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 mx-auto">
+            {[
+              { id: 'home', label: 'Browse', icon: Home },
+              { id: 'search', label: 'Search', icon: Search },
+              { id: 'dashboard', label: 'Workspace', icon: LayoutDashboard },
+              { id: 'profile', label: 'Profile', icon: User }
+            ].map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navigateTab(item.id)}
+                  className={`flex items-center gap-1.5 text-[11px] lg:text-xs font-syne font-black uppercase tracking-wider transition-all duration-300 relative cursor-pointer ${
+                    isActive ? 'text-violet-400 font-black' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <motion.span
+                      layoutId="desktopNavActiveIndicator"
+                      className="absolute -bottom-[21px] left-0 right-0 h-[2.5px] bg-gradient-to-r from-violet-500 to-indigo-505"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
           {/* Quick Stats / Right Side Actions */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             
-            {/* Post a Listing Button (Shown on SM screens and above, hidden on mobile since mobile has the center float nav button) */}
+            {/* Post a Listing Button (Shown on desktop, hidden on mobile since center button has it) */}
             <button
               onClick={onOpenAddListing}
-              className="hidden sm:inline-flex px-4 py-1.5 rounded-full text-xs font-syne font-extrabold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/20 active:scale-95 transition-all shadow-sm cursor-pointer"
+              className="hidden lg:inline-flex px-4 py-1.5 rounded-full text-[11px] font-syne font-extrabold text-slate-205 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/20 active:scale-95 transition-all shadow-sm cursor-pointer"
             >
               Post a Listing
             </button>
 
-            {/* Sign Up Free button in header (Shown on MD screens and above) */}
+            {/* Sign Up Free button in header */}
             <button
               onClick={() => {
                 alert("Welcome! You are currently exploring under our Elite Tour Profile. Signing up with Kenya Safekeeping is free and verified instantly with M-Pesa KYC.");
               }}
-              className="hidden md:inline-flex px-4.5 py-1.5 rounded-full text-xs font-syne font-extrabold text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-violet-600/25 cursor-pointer"
+              className="hidden lg:inline-flex px-4.5 py-1.5 rounded-full text-[11px] font-syne font-extrabold text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-violet-600/25 cursor-pointer"
             >
               Sign Up Free
             </button>
@@ -219,9 +253,97 @@ export default function Navbar({
               </span>
             </button>
 
+            {/* Mobile Hamburger Menu Toggle Button (Requirement 8) */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden w-10 h-10 rounded-full hover:bg-white/5 flex justify-center items-center text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Toggle Menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5" />}
+            </button>
+
           </div>
         </div>
       </header>
+
+      {/* 1.1 MOBILE FLOATING DROPDOWN DRAWER PANEL (Requirement 8) */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="md:hidden w-full bg-[#121324]/95 backdrop-blur-xl border-b border-white/10 overflow-hidden relative z-40"
+          >
+            <div className="p-4 sm:p-5 flex flex-col gap-3 text-left">
+              {[
+                { id: 'home', label: 'Browse', icon: Home, desc: 'Premium verified properties' },
+                { id: 'search', label: 'Interactive Search', icon: Search, desc: 'Advanced search & location matrix' },
+                { id: 'dashboard', label: 'My Workspace', icon: LayoutDashboard, desc: 'Landlord & Tenant Desk' },
+                { id: 'profile', label: 'My Profile', icon: User, desc: 'Edit identity credentials' }
+              ].map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      navigateTab(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-start gap-3.5 p-2.5 rounded-xl transition-all ${
+                      isActive 
+                        ? 'bg-violet-955/40 border border-violet-500/20' 
+                        : 'hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${
+                      isActive ? 'bg-gradient-to-br from-violet-500 to-indigo-500 text-white' : 'bg-white/5 text-slate-400'
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className={`text-[11px] font-syne font-black uppercase tracking-wider block ${
+                        isActive ? 'text-violet-450' : 'text-slate-205'
+                      }`}>
+                        {item.label}
+                      </span>
+                      <span className="text-[9px] text-slate-400 block font-semibold">
+                        {item.desc}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+
+              <div className="h-[1px] bg-white/5 my-1" />
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    onOpenAddListing();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl text-center text-[11px] font-syne font-black text-slate-205 bg-white/5 hover:bg-white/10 border border-white/15 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5 text-violet-405" />
+                  Post a Listing Classified
+                </button>
+                <button
+                  onClick={() => {
+                    alert("Welcome! You are currently exploring under our Elite Tour Profile. Signing up with Kenya Safekeeping is free and verified instantly with M-Pesa KYC.");
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full py-3 rounded-xl text-center text-[11px] font-syne font-black text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all uppercase tracking-wider shadow-lg shadow-violet-605/20"
+                >
+                  Sign Up Free Account
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 2. PERSISTENT FLOATING BOTTOM NAVIGATION BAR (Mobile-First / Glassmorphism visual theme) */}
       <nav 

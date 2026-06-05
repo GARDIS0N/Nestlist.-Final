@@ -569,10 +569,16 @@ export default function Dashboards({
   };
 
   if (currentRole === 'Admin') {
-    const totalRevenueVal = 225000 + transactions.filter(t => t.status === 'success').reduce((sum, t) => sum + t.amount, 0);
+    const totalRevenueVal = transactions.filter(t => t.status === 'success').reduce((sum, t) => sum + t.amount, 0);
     const activeListingsCount = listings.filter(l => l.status === 'active').length;
     const totalUsersCount = userAccounts.length;
-    const thisMonthRevenue = 59400;
+    
+    // Sum last 30 days dynamically
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const thisMonthRevenue = transactions
+      .filter(t => t.status === 'success' && new Date(t.createdAt).getTime() >= thirtyDaysAgo)
+      .reduce((sum, t) => sum + t.amount, 0);
+
     const pendingReviewCount = reports.length + (userProfile.kycStatus === 'pending' ? 1 : 0);
     const suspendedCount = userAccounts.filter(u => u.isSuspended).length + listings.filter(l => l.status === 'paused').length;
 
@@ -1899,7 +1905,7 @@ export default function Dashboards({
         const activeCount = filteredMyListings.filter(l => l.status === 'active').length;
         const totalViews = filteredMyListings.reduce((sum, l) => sum + (l.views || 0), 0);
         const totalInq = myInquiries.length;
-        const calculatedRevenue = 225000 + transactions.filter(t => t.status === 'success' && t.description.toLowerCase().includes('boost')).reduce((sum, t) => sum + t.amount, 0);
+        const calculatedRevenue = transactions.filter(t => t.status === 'success' && t.description.toLowerCase().includes('boost')).reduce((sum, t) => sum + t.amount, 0);
 
         // Helper time formatting
         const formatRelativeTime = (isoString?: string) => {
@@ -2799,7 +2805,7 @@ export default function Dashboards({
 
                 <span className="text-xs text-gray-400 uppercase font-mono block pt-4">Registered Supabase Auth identities</span>
                 
-                <div className="glass-premium rounded-2xl overflow-hidden border border-white/5">
+                <div className="glass-premium rounded-2xl overflow-x-auto border border-white/5">
                   <table className="w-full text-left text-xs font-mono text-gray-300">
                     <thead className="bg-brand-dark text-gray-500 uppercase text-[9px] border-b border-white/5">
                       <tr>
@@ -2871,7 +2877,7 @@ export default function Dashboards({
                   </button>
                 </div>
 
-                <div className="glass-premium rounded-2xl overflow-hidden border border-white/5">
+                <div className="glass-premium rounded-2xl overflow-x-auto border border-white/5">
                   <table className="w-full text-left text-xs font-mono text-gray-300">
                     <thead className="bg-brand-dark text-gray-500 uppercase text-[9px]">
                       <tr>

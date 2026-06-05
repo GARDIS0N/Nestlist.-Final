@@ -201,6 +201,117 @@ export default function App() {
       });
   };
 
+  const refreshUserData = () => {
+    const token = localStorage.getItem('nestlist_token');
+    if (!token) return;
+
+    // 1. Fetch Inquiries
+    fetch(getApiUrl('/api/inquiries'), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.inquiries) {
+          // Translate to listing-detail model representation
+          const mapped = data.inquiries.map((i: any) => ({
+            id: i.id,
+            listingId: i.listingId,
+            listingTitle: i.listingTitle || 'Rent Property',
+            listingImage: i.listingImage || '',
+            senderName: i.tenantName || 'Tenant Name',
+            senderEmail: i.tenantEmail || 'tenant@email.com',
+            senderPhone: i.tenantPhone || '',
+            message: i.message,
+            isReplied: i.isReplied || false,
+            createdAt: i.createdAt
+          }));
+          setInquiries(mapped);
+        }
+      })
+      .catch(err => console.warn("Failed to fetch inquiries:", err));
+
+    // 2. Fetch Notifications
+    fetch(getApiUrl('/api/notifications'), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.notifications) {
+          // Map to local Notification schema
+          const mapped = data.notifications.map((n: any) => ({
+            id: n.id,
+            userId: n.userId,
+            type: n.type || 'inquiry',
+            title: n.title,
+            description: n.message,
+            isRead: n.isRead,
+            createdAt: n.createdAt
+          }));
+          setNotifications(mapped);
+        }
+      })
+      .catch(err => console.warn("Failed to fetch notifications:", err));
+
+    // 3. Fetch Transactions / Payments
+    fetch(getApiUrl('/api/payments'))
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.payments) {
+          const txs: Transaction[] = data.payments.map((p: any) => ({
+            id: p.id,
+            userId: p.userId || 'current-user-id',
+            amount: p.amount,
+            currency: p.currency || 'KES',
+            status: p.status || 'success',
+            description: p.description || 'Property Listing Payment',
+            type: p.type || 'boost',
+            createdAt: p.createdAt || p.paymentTimestamp || new Date().toISOString()
+          }));
+          setTransactions(txs);
+        }
+      })
+      .catch(err => console.warn("Failed to fetch payments:", err));
+
+    // 4. Fetch Users (for Admin Workspace space)
+    fetch(getApiUrl('/api/users'), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.users) {
+          const accounts = data.users.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            isSuspended: u.isSuspended || false,
+            email: u.email
+          }));
+          setUserAccounts(accounts);
+        }
+      })
+      .catch(err => console.warn("Failed to fetch user accounts:", err));
+
+    // 5. Fetch Reports / claims (for claims management)
+    fetch(getApiUrl('/api/reports'), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.reports) {
+          setReports(data.reports);
+        }
+      })
+      .catch(err => console.warn("Failed to fetch system claims:", err));
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      refreshUserData();
+      const userInterval = setInterval(refreshUserData, 6000);
+      return () => clearInterval(userInterval);
+    }
+  }, [isLoggedIn]);
+
   useEffect(() => {
     // Identity auto-login from local token on layout mount
     const token = localStorage.getItem('nestlist_token');
@@ -839,6 +950,8 @@ export default function App() {
                 onSelectSimilar={setSelectedListingId}
                 onAddViewing={handleAddViewingRequest}
                 onAddInquiry={handleAddInquiry}
+                isLoggedIn={isLoggedIn}
+                userProfile={userProfile}
               />
             </motion.div>
           ) 
@@ -1067,8 +1180,8 @@ export default function App() {
               <div className="bg-[#0E0F1C]/85 backdrop-blur-md border border-white/10 rounded-3xl p-5 space-y-4 font-dmsans">
                 
                 {/* Scrollable Row for Unified Property and bedroom pills */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/5 pb-4">
-                  <div className="space-y-1">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-white/5 pb-4 overflow-hidden w-full">
+                  <div className="space-y-1 w-full max-w-full overflow-hidden">
                     <span className="block text-[10px] text-slate-500 font-bold uppercase font-mono tracking-widest">Filter by category or size:</span>
                     <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-2 md:pb-0 scrollbar-none max-w-full">
                       {[
@@ -1281,7 +1394,7 @@ export default function App() {
                     <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">VERIFIED PREMIUM SELECTIONS</span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {compiledListings.filter(l => l.isFeatured).slice(0, 3).map(item => (
                       <div key={item.id} className="transition-all duration-300 hover:scale-[1.03] scale-[1.02] origin-center z-10">
                         <ListingCard 
@@ -1310,8 +1423,8 @@ export default function App() {
               {/* LISTINGS Grid FEED */}
               {isListingsLoading ? (
                 /* Skeleton loader (Upgrade 9) */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-                  {[1, 2, 3].map(i => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 text-left">
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-[#0E0F1C]/75 border border-white/5 rounded-[24px] p-4 space-y-4 animate-pulse">
                       <div className="w-full h-[180px] bg-slate-800/35 rounded-2xl animate-skeleton" />
                       <div className="h-4.5 bg-slate-800/35 rounded w-3/4 animate-skeleton" />
@@ -1363,8 +1476,8 @@ export default function App() {
                 </div>
               ) : (
                 <div className="space-y-8 text-left">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {paginatedListings.map(item => (
                         <div key={item.id} className="transition-all duration-300 hover:scale-[1.015]">
                           <ListingCard 

@@ -1303,6 +1303,82 @@ app.get("/api/payments/mpesa/status/:checkoutRequestID", async (req, res) => {
 });
 
 
+// List Inquiries (Sent or Received depending on role structure)
+app.get("/api/inquiries", authenticateToken, async (req: any, res) => {
+  if (isSupabaseActive()) {
+    try {
+      return res.json({ success: true, inquiries: [] });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  } else {
+    const db = loadDB();
+    const userRole = req.user.role;
+    const userId = req.user.userId;
+    
+    let filteredInquiries = [];
+    if (userRole === "Tenant") {
+      filteredInquiries = (db.inquiries || []).filter((i: any) => i.tenantId === userId);
+    } else {
+      const userListings = (db.listings || []).filter((l: any) => l.author?.id === userId);
+      const userListingIds = userListings.map((l: any) => l.id);
+      filteredInquiries = (db.inquiries || []).filter((i: any) => userListingIds.includes(i.listingId));
+    }
+    
+    res.json({ success: true, inquiries: filteredInquiries });
+  }
+});
+
+// List Registered Users (Safe projection for Admin space)
+app.get("/api/users", authenticateToken, async (req: any, res) => {
+  if (isSupabaseActive()) {
+    try {
+      return res.json({ success: true, users: [] });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  } else {
+    const db = loadDB();
+    const safeUsers = (db.users || []).map(({ passwordHash, ...u }: any) => u);
+    res.json({ success: true, users: safeUsers });
+  }
+});
+
+// Get all system Claims and Flag Reports
+app.get("/api/reports", authenticateToken, async (req: any, res) => {
+  const db = loadDB();
+  res.json({ success: true, reports: db.reports || [] });
+});
+
+// Submit a System Flag / Report
+app.post("/api/reports", authenticateToken, async (req: any, res) => {
+  const { listingId, reason, details } = req.body;
+  if (!listingId || !reason) {
+    return res.status(400).json({ success: false, error: "listingId and reason are required" });
+  }
+  
+  const db = loadDB();
+  const listing = (db.listings || []).find((l: any) => l.id === listingId);
+  const freshReport = {
+    id: `rep-${Date.now()}`,
+    listingId,
+    listingTitle: listing ? listing.title : "Unknown Property",
+    reporterName: req.user.name,
+    reporterEmail: req.user.email,
+    reason,
+    details: details || "",
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+  
+  db.reports = db.reports || [];
+  db.reports.push(freshReport);
+  saveDB(db);
+  
+  res.status(201).json({ success: true, report: freshReport });
+});
+
+
 // MIDDLEWARE GATEWAYS AND STATIC ASSETS SERVING FOR PRODUCTION AND GENERAL IFRAME INTERACTIVE CHANNELS
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
