@@ -25,7 +25,14 @@ export function getApiUrl(path: string): string {
     return `${cleanBase}${cleanPath}`;
   }
 
-  // Fallback directly to the live container endpoint for this applet
-  const fallbackBase = "https://ais-pre-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app";
+  // Allow manual dynamic override via localStorage
+  const localOverride = typeof window !== 'undefined' ? localStorage.getItem('nestlist_api_override') : null;
+  if (localOverride) {
+    const cleanBase = localOverride.endsWith('/') ? localOverride.slice(0, -1) : localOverride;
+    return `${cleanBase}${cleanPath}`;
+  }
+
+  // Fallback directly to the active development server container endpoint for this applet
+  const fallbackBase = "https://ais-dev-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app";
   return `${fallbackBase}${cleanPath}`;
 }
