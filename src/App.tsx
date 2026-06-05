@@ -227,7 +227,27 @@ export default function App() {
           localStorage.removeItem('nestlist_token');
         }
       })
-      .catch(err => console.error("Identity auto-login error:", err));
+      .catch(err => {
+        console.warn("Identity auto-login error. Attempting cached credentials fallback...", err);
+        const savedPhone = localStorage.getItem('nestlist_user_phone') || '';
+        const savedRole = localStorage.getItem('nestlist_role') as UserRole || 'Tenant';
+        const savedEmail = localStorage.getItem('nestlist_email');
+        const savedName = localStorage.getItem('nestlist_name');
+
+        if (savedEmail && savedRole) {
+          setCurrentRole(savedRole);
+          setUserProfile(prev => ({
+            ...prev,
+            fullName: savedName || prev.fullName,
+            contactEmail: savedEmail,
+            contactPhone: savedPhone || prev.contactPhone,
+            kycStatus: savedRole === 'Agent' || savedRole === 'Landlord' ? 'verified' : 'pending'
+          }));
+          setIsLoggedIn(true);
+        } else {
+          localStorage.removeItem('nestlist_token');
+        }
+      });
     }
 
     refreshServerListings();

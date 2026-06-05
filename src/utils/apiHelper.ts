@@ -33,6 +33,6 @@ export function getApiUrl(path: string): string {
   }
 
   // Fallback directly to the active development server container endpoint for this applet
-  const fallbackBase = "https://ais-dev-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app";
+  const fallbackBase = "https://ais-pre-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app";
   return `${fallbackBase}${cleanPath}`;
 }
