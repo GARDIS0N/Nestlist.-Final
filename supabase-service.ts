@@ -15,14 +15,32 @@ export const supabase = isConfigured ? createClient(SUPABASE_URL, SUPABASE_KEY, 
   }
 }) : null;
 
-if (isConfigured) {
-  console.log("⚡ Supabase integration active on:", SUPABASE_URL);
+let useLocalFallback = true; // Default to local fallback until verified
+
+if (isConfigured && supabase) {
+  console.log("⚡ Checking Supabase SQL schema health on:", SUPABASE_URL);
+  (async () => {
+    try {
+      const { error } = await supabase.from("users").select("id").limit(1);
+      if (error) {
+        console.warn("ℹ️ Supabase tables are inactive or missing. NestList fallback local engine enabled.", error.message);
+        useLocalFallback = true;
+      } else {
+        console.log("⚡ Supabase SQL schema healthy! Connected directly to Cloud PostgreSQL.");
+        useLocalFallback = false;
+      }
+    } catch (err) {
+      console.warn("ℹ️ Supabase connection check failed. Fallback local engine enabled.", err);
+      useLocalFallback = true;
+    }
+  })();
 } else {
   console.log("ℹ️ Supabase environment variables not set. NestList fallback local engine enabled.");
+  useLocalFallback = true;
 }
 
 export function isSupabaseActive(): boolean {
-  return isConfigured && supabase !== null;
+  return isConfigured && supabase !== null && !useLocalFallback;
 }
 
 // ============================================
