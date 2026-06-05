@@ -103,39 +103,39 @@ export default function Navbar({
           {/* Logo Brand */}
           <div 
             onClick={() => navigateTab('home')}
-            className="flex items-center gap-3.5 cursor-pointer group active:scale-95 transition-all"
+            className="flex items-center gap-2 md:gap-3.5 cursor-pointer group active:scale-95 transition-all text-left"
           >
-            <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-violet-950/50 group-hover:scale-105 transition-transform duration-300">
-              <Home className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-violet-950/50 group-hover:scale-105 transition-transform duration-300">
+              <Home className="w-4.5 h-4.5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-2xl md:text-3xl font-syne font-black bg-gradient-to-r from-white via-indigo-200 to-violet-400 bg-clip-text text-transparent tracking-tight">NestList</span>
-                <span className="bg-emerald-500/20 text-emerald-450 border border-emerald-500/30 text-[8px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <div className="flex items-center gap-1">
+                <span className="text-lg sm:text-2xl md:text-3xl font-syne font-black bg-gradient-to-r from-white via-indigo-200 to-violet-400 bg-clip-text text-transparent tracking-tight">NestList</span>
+                <span className="hidden xs:inline-block bg-emerald-500/20 text-emerald-450 border border-emerald-500/30 text-[8px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   DIRECT
                 </span>
               </div>
-              <span className="text-[10px] text-slate-400 font-bold font-dmsans block -mt-0.5 leading-none uppercase tracking-wider text-indigo-300/80">Ke Safekeeping Network</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold font-dmsans block -mt-0.5 leading-none uppercase tracking-wider text-indigo-300/80">Ke Safekeeping Network</span>
             </div>
           </div>
 
           {/* Quick Stats / Right Side Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             
-            {/* Post a Listing Button */}
+            {/* Post a Listing Button (Shown on SM screens and above, hidden on mobile since mobile has the center float nav button) */}
             <button
               onClick={onOpenAddListing}
-              className="px-4.5 py-1.5 rounded-full text-xs font-syne font-extrabold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/20 active:scale-95 transition-all shadow-sm cursor-pointer"
+              className="hidden sm:inline-flex px-4 py-1.5 rounded-full text-xs font-syne font-extrabold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/20 active:scale-95 transition-all shadow-sm cursor-pointer"
             >
               Post a Listing
             </button>
 
-            {/* Sign Up Free button in header */}
+            {/* Sign Up Free button in header (Shown on MD screens and above) */}
             <button
               onClick={() => {
                 alert("Welcome! You are currently exploring under our Elite Tour Profile. Signing up with Kenya Safekeeping is free and verified instantly with M-Pesa KYC.");
               }}
-              className="px-4.5 py-1.5 rounded-full text-xs font-syne font-extrabold text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-violet-600/25 cursor-pointer"
+              className="hidden md:inline-flex px-4.5 py-1.5 rounded-full text-xs font-syne font-extrabold text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-violet-600/25 cursor-pointer"
             >
               Sign Up Free
             </button>
@@ -206,7 +206,7 @@ export default function Navbar({
             {/* Profile Avatar Quick Tapper */}
             <button
               onClick={() => navigateTab('profile')}
-              className="flex items-center gap-2 p-1 pl-1 pr-3 rounded-full hover:bg-white/5 border border-white/10 transition-all cursor-pointer text-slate-305"
+              className="flex items-center gap-2 p-1 pl-1 pr-1 md:pr-3 rounded-full hover:bg-white/5 border border-white/10 transition-all cursor-pointer text-slate-305"
             >
               <img 
                 src={userProfile.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} 
@@ -214,7 +214,7 @@ export default function Navbar({
                 className="w-7 h-7 rounded-full object-cover border border-[#08080F]"
                 referrerPolicy="no-referrer"
               />
-              <span className="hidden sm:inline text-xs font-bold text-slate-300">
+              <span className="hidden md:inline text-xs font-bold text-slate-300">
                 {userProfile.fullName.split(' ')[0]}
               </span>
             </button>

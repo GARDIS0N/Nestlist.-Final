@@ -579,8 +579,8 @@ export default function Dashboards({
     return (
       <div id="admin-workspace-deck" className="min-h-screen w-full bg-[#04050a] text-slate-300 flex font-sans relative">
         
-        {/* FIXED SIDEBAR: 220px wide */}
-        <div className="w-[220px] fixed inset-y-0 left-0 bg-[#070814] border-r border-white/5 flex flex-col justify-between z-30 select-none">
+        {/* FIXED SIDEBAR: 220px wide (Hidden on mobile) */}
+        <div className="hidden md:flex w-[220px] fixed inset-y-0 left-0 bg-[#070814] border-r border-white/5 flex flex-col justify-between z-30 select-none">
           <div className="flex flex-col">
             {/* Logo: NestList logo with gradient N icon */}
             <div className="p-5 flex items-center gap-3 border-b border-white/5">
@@ -643,33 +643,70 @@ export default function Dashboards({
           </div>
         </div>
 
-        {/* MAIN CONTAINER PANEL (padding-left [220px] to make room for fixed sidebar) */}
-        <div className="flex-grow min-h-screen pl-[220px] bg-[#040509] flex flex-col">
+        {/* MAIN CONTAINER PANEL (padding-left pl-0 on mobile, md:pl-[220px] for desktop sidebar) */}
+        <div className="flex-grow min-h-screen pl-0 md:pl-[220px] bg-[#040509] flex flex-col">
           
           {/* Header Bar */}
-          <div className="border-b border-white/5 bg-[#070814]/40 backdrop-blur px-8 py-5 flex justify-between items-center select-none">
-            <div>
-              <h1 className="text-lg font-serif font-bold text-white uppercase tracking-wider font-mono">
-                {adminSidebarTab === 'overview' && 'SYSTEM DESK MONITOR'}
-                {adminSidebarTab === 'listings' && 'PROPERTY DICTATION LEDGER'}
-                {adminSidebarTab === 'users' && 'SUPABASE COMPLIANCE OFFICE'}
-                {adminSidebarTab === 'revenue' && 'STRIPE INTEGRATION LEDGER'}
-                {adminSidebarTab === 'reports' && 'CLAIM EXCLUSION DISPATCH'}
-                {adminSidebarTab === 'settings' && 'ENVIRONMENT CONSTANT CONTROLS'}
-              </h1>
-              <p className="text-[10px] text-gray-500 font-mono mt-0.5 uppercase tracking-wider">
-                Node ID: KE-CL-82 • SSL Sandbox active
-              </p>
+          <div className="border-b border-white/5 bg-[#070814]/40 backdrop-blur px-4 md:px-8 py-4 sm:py-5 flex flex-col justify-start select-none">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 w-full">
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider font-mono">
+                  {adminSidebarTab === 'overview' && 'SYSTEM DESK MONITOR'}
+                  {adminSidebarTab === 'listings' && 'PROPERTY DICTATION LEDGER'}
+                  {adminSidebarTab === 'users' && 'SUPABASE COMPLIANCE OFFICE'}
+                  {adminSidebarTab === 'revenue' && 'STRIPE INTEGRATION LEDGER'}
+                  {adminSidebarTab === 'reports' && 'CLAIM EXCLUSION DISPATCH'}
+                  {adminSidebarTab === 'settings' && 'ENVIRONMENT CONSTANT CONTROLS'}
+                </h1>
+                <p className="text-[9px] sm:text-[10px] text-gray-500 font-mono mt-0.5 uppercase tracking-wider">
+                  Node ID: KE-CL-82 • SSL Sandbox active
+                </p>
+              </div>
+              <div className="flex items-center gap-3 font-mono text-[10px] sm:text-[11px]">
+                <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#0e0f22] border border-white/5 text-purple-400 font-bold rounded-lg uppercase tracking-wide">
+                  ● SECURITY DEPLOYED
+                </span>
+                <button
+                  onClick={onLogout}
+                  className="inline-block md:hidden px-2.5 py-1 bg-red-500/15 border border-red-500/20 text-red-400 rounded-lg text-[10px] hover:bg-red-500/25 transition-all font-bold tracking-wide"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3 font-mono text-[11px]">
-              <span className="px-3 py-1.5 bg-[#0e0f22] border border-white/5 text-purple-400 font-bold rounded-lg uppercase tracking-wide">
-                ● SECURITY DEPLOYED
-              </span>
+
+            {/* Mobile Horizontal Tabs Row (Visible only on mobile screen widths) */}
+            <div className="block md:hidden w-full overflow-x-auto whitespace-nowrap scrollbar-none py-1 border-t border-white/5 pt-3.5 mt-3">
+              <div className="flex gap-2">
+                {[
+                  { id: 'overview', label: 'Monitor' },
+                  { id: 'listings', label: 'Listings' },
+                  { id: 'users', label: 'Users' },
+                  { id: 'revenue', label: 'Revenue' },
+                  { id: 'reports', label: 'Claims' },
+                  { id: 'settings', label: 'Params' }
+                ].map(item => {
+                  const isActive = adminSidebarTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setAdminSidebarTab(item.id as any)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold tracking-wider transition-all select-none cursor-pointer ${
+                        isActive 
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold shadow-md' 
+                          : 'bg-[#121324] text-gray-400 border border-white/5'
+                      }`}
+                    >
+                      {item.label.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           {/* Inner Content Pane */}
-          <div className="p-8 space-y-8 flex-1 max-w-7xl w-full mx-auto">
+          <div className="p-4 md:p-8 space-y-6 md:space-y-8 flex-1 max-w-7xl w-full mx-auto">
             
             {/* OVERVIEW TAB */}
             {adminSidebarTab === 'overview' && (
