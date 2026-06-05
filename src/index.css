@@ -1,119 +1,158 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Syne:wght@400..800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-syne: "Syne", sans-serif;
+  --font-dmsans: "DM Sans", sans-serif;
   
-  --color-brand-dark: #090E17;
-  --color-brand-card: #121A2C;
-  --color-brand-blue: #3B82F6;
-  --color-brand-gold: #F59E0B;
+  --color-brand-dark: #F8F9FA;
+  --color-brand-card: #FFFFFF;
+  --color-brand-blue: #1B3A6B;
+  --color-brand-gold: #4CAF50;
 }
 
 @layer utilities {
-  /* Premium Glassmorphism & High-Contrast Cards */
+  /* Minimal Polish & High-Contrast Cards */
   .glass-premium {
-    background: rgba(18, 26, 44, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
   }
 
   .glass-premium-interactive {
-    background: rgba(18, 26, 44, 0.8);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow: 0 8px 30px -8px rgba(0, 0, 0, 0.4);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease-in-out;
   }
 
   .glass-premium-interactive:hover {
-    background: rgba(22, 32, 54, 0.9);
-    border-color: rgba(59, 130, 246, 0.25);
-    box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.6), 0 0 15px -3px rgba(59, 130, 246, 0.15);
+    background: #F1F5F9;
+    border-color: #CBD5E1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
   }
   
   .glass-gold {
-    background: rgba(245, 158, 11, 0.04);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    box-shadow: 0 0 20px -5px rgba(245, 158, 11, 0.1);
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
   }
 
   .glass-gold-interactive {
-    background: rgba(245, 158, 11, 0.04);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    box-shadow: 0 0 15px -5px rgba(245, 158, 11, 0.08);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    transition: all 0.2s ease-in-out;
   }
 
   .glass-gold-interactive:hover {
-    background: rgba(245, 158, 11, 0.07);
-    border-color: rgba(245, 158, 11, 0.45);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 25px -2px rgba(245, 158, 11, 0.2);
+    background: #FEF3C7;
+    border-color: #FCD34D;
   }
 
   .glass-glow {
-    box-shadow: 0 0 30px -5px rgba(59, 130, 246, 0.25), 0 0 15px -1px rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 15px -3px rgba(37, 99, 235, 0.1), 0 0 10px -2px rgba(217, 119, 6, 0.05);
   }
 
   .text-shadow-subtle {
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
   .text-shadow-gold {
-    text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    text-shadow: 0 0 4px rgba(217, 119, 6, 0.1);
   }
 
-  /* Custom Premium Scrollbar */
+  /* Custom Clean Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #090E17;
+    background: #F8FAFC;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.12);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3B82F6;
+    background: #2563EB;
   }
 }
 
 /* Base custom resets */
 body {
-  background-color: #090E17;
-  color: #F8FAFC;
+  background-color: #04050A;
+  color: #E2E8F0;
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
 
 h1, h2, h3, .heading-serif {
-  font-family: var(--font-serif);
-  letter-spacing: -0.02em;
+  font-family: var(--font-syne);
+  letter-spacing: -0.01em;
 }
 
-/* Clean animated signals */
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
+/* Custom CSS keyframes for upgrades */
+@keyframes shimmerGrad {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
-.animate-pulse-glow {
-  animation: pulseGlow 2.5s infinite ease-in-out;
+@keyframes goldShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes skeletonLoader {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes popHeart {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.4); }
+  50% { transform: scale(0.9); }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.animate-shimmer-line {
+  background-size: 200% 200%;
+  animation: shimmerGrad 4s ease infinite;
+}
+
+.animate-gold-shimmer {
+  background-size: 200% 200%;
+  animation: goldShimmer 3s linear infinite;
+}
+
+.animate-skeleton {
+  background: linear-gradient(90deg, #121324 25%, #1d1e38 50%, #121324 75%);
+  background-size: 200% 100%;
+  animation: skeletonLoader 1.5s infinite;
+}
+
+.animate-heart-pulse {
+  animation: popHeart 0.5s ease-out;
+}
+
+.glow-purple-focus:focus-within {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+  border-color: rgba(139, 92, 246, 0.6);
+}
+
+.glow-gold-premium {
+  box-shadow: 0 0 25px rgba(245, 200, 66, 0.25);
+}
+
+/* Scrollbar styling for horizontal list pills */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }

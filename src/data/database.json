@@ -1,0 +1,196 @@
+{
+  "users": [
+    {
+      "id": "usr_erick",
+      "email": "erick.c@tech.com",
+      "name": "Erick Cheruiyot",
+      "passwordHash": "a18357da289be7ce47f48b17b6070a7bbefee76dfb3ef656e1882fb307dfb307",
+      "role": "Tenant",
+      "phone": "+254712345678",
+      "isVerified": true,
+      "favorites": ["list-1", "list-3"],
+      "createdAt": "2026-06-01T10:00:00.000Z"
+    },
+    {
+      "id": "usr_victoria",
+      "email": "victoria@nestlist.luxury",
+      "name": "Victoria Vance",
+      "passwordHash": "a18357da289be7ce47f48b17b6070a7bbefee76dfb3ef656e1882fb307dfb307",
+      "role": "Agent",
+      "phone": "+254722111222",
+      "isVerified": true,
+      "favorites": [],
+      "createdAt": "2026-06-01T11:00:00.000Z"
+    },
+    {
+      "id": "usr_mwangi",
+      "email": "mwangi@nestlist.luxury",
+      "name": "David Mwangi",
+      "passwordHash": "a18357da289be7ce47f48b17b6070a7bbefee76dfb3ef656e1882fb307dfb307",
+      "role": "Landlord",
+      "phone": "+254733444555",
+      "isVerified": true,
+      "favorites": [],
+      "createdAt": "2026-06-01T12:00:00.000Z"
+    }
+  ],
+  "listings": [
+    {
+      "id": "list-1",
+      "title": "The Kilimani Executive Heights",
+      "description": "Rising gracefully over the central skyline of Kilimani, this 3-bedroom luxury apartment delivers bespoke urban charm. Offering panoramic views of Nairobi from its wrap-around glass balcony, the home features polished porcelain tiling, continuous solar water heating, high-speed interior elevators, a fully-equipped resident fitness center, and robust multi-tier security access controls.",
+      "propertyType": "Apartment",
+      "roleType": "Agent",
+      "location": {
+        "address": "Chania Avenue, Kilimani, Nairobi",
+        "coordinates": { "lat": -1.2941, "lng": 36.7893 },
+        "neighborhood": "Kilimani",
+        "tags": ["Skyline Balcony", "Central Location", "Solar Hot Water", "Elevator Access"],
+        "county": "Nairobi County"
+      },
+      "details": {
+        "bedrooms": 3,
+        "bathrooms": 3,
+        "size": 180,
+        "sizeUnit": "sqm",
+        "isFurnished": true,
+        "amenities": ["wifi", "parking", "gym", "security", "water", "electricity_backup"]
+      },
+      "pricing": {
+        "rent": 120000,
+        "deposit": 120000,
+        "currency": "KES",
+        "frequency": "monthly"
+      },
+      "media": {
+        "images": [
+          { "id": "img-1-1", "listingId": "list-1", "url": "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=1200", "isCover": true, "order": 1 },
+          { "id": "img-1-2", "listingId": "list-1", "url": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=800", "isCover": false, "order": 2 },
+          { "id": "img-1-3", "listingId": "list-1", "url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&q=80&w=800", "isCover": false, "order": 3 }
+        ],
+        "videoUrl": "",
+        "virtualTourUrl": ""
+      },
+      "author": {
+        "id": "usr_victoria",
+        "name": "Victoria Vance",
+        "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150",
+        "role": "Agent",
+        "phone": "+254722111222",
+        "email": "victoria@nestlist.luxury",
+        "isVerified": true
+      },
+      "isFeatured": true,
+      "status": "active",
+      "createdAt": "2026-06-01T15:00:00.000Z",
+      "views": 256,
+      "inquiriesCount": 12,
+      "savesCount": 54
+    },
+    {
+      "id": "list-2",
+      "title": "The Karen Sanctuary Manor",
+      "description": "Tucked away in the elite forested enclave of Karen, this magnificent country house stands as a masterwork of premium architectural design. Spanning over lush manicured gardens, the residence enjoys a modern multi-level layout, an expansive double-volume reception hall, a separate guest wing, an high-capacity backup generator system, a private home gym suite, and a fully automated continuous perimeter fence system.",
+      "propertyType": "House",
+      "roleType": "Landlord",
+      "location": {
+        "address": "Miotoni Road, Karen, Nairobi",
+        "coordinates": { "lat": -1.3321, "lng": 36.7112 },
+        "neighborhood": "Karen",
+        "tags": ["Mature Garden", "Absolute Privacy", "Backup Power", "Diplomatic Hub"],
+        "county": "Nairobi County"
+      },
+      "details": {
+        "bedrooms": 5,
+        "bathrooms": 6,
+        "size": 4200,
+        "sizeUnit": "sqft",
+        "isFurnished": false,
+        "amenities": ["wifi", "parking", "gym", "security", "water", "electricity_backup"]
+      },
+      "pricing": {
+        "rent": 350000,
+        "deposit": 700000,
+        "currency": "KES",
+        "frequency": "monthly"
+      },
+      "media": {
+        "images": [
+          { "id": "img-2-1", "listingId": "list-2", "url": "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&q=80&w=1200", "isCover": true, "order": 1 },
+          { "id": "img-2-2", "listingId": "list-2", "url": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800", "isCover": false, "order": 2 },
+          { "id": "img-2-3", "listingId": "list-2", "url": "https://images.unsplash.com/photo-1628155930542-3c7a64e2c833?auto=format&fit=crop&q=80&w=800", "isCover": false, "order": 3 }
+        ],
+        "videoUrl": "",
+        "virtualTourUrl": ""
+      },
+      "author": {
+        "id": "usr_mwangi",
+        "name": "David Mwangi",
+        "avatar": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150",
+        "role": "Landlord",
+        "phone": "+254733444555",
+        "email": "mwangi@nestlist.luxury",
+        "isVerified": true
+      },
+      "isFeatured": true,
+      "status": "active",
+      "createdAt": "2026-06-02T09:30:00.000Z",
+      "views": 412,
+      "inquiriesCount": 8,
+      "savesCount": 89
+    },
+    {
+      "id": "list-3",
+      "title": "Westlands Executive Studio Loft",
+      "description": "Located right in the cosmopolitan center of Westlands, this premium studio loft features an ideal open-plan kitchen, integrated high-spec cabinetry, a floor-to-ceiling modern custom wardrobe, private resident underground parking, continuous borehole supply water, and superfast preinstalled fiber-optic broadband connection.",
+      "propertyType": "Studio",
+      "roleType": "Agent",
+      "location": {
+        "address": "Woodvale Grove, Westlands, Nairobi",
+        "coordinates": { "lat": -1.2621, "lng": 36.8019 },
+        "neighborhood": "Westlands",
+        "tags": ["Modern Loft", "Walking Distance Core", "Pre-wired Fiber"],
+        "county": "Nairobi County"
+      },
+      "details": {
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "size": 55,
+        "sizeUnit": "sqm",
+        "isFurnished": true,
+        "amenities": ["wifi", "parking", "security", "water"]
+      },
+      "pricing": {
+        "rent": 45000,
+        "deposit": 45000,
+        "currency": "KES",
+        "frequency": "monthly"
+      },
+      "media": {
+        "images": [
+          { "id": "img-3-1", "listingId": "list-3", "url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&q=80&w=1200", "isCover": true, "order": 1 }
+        ],
+        "videoUrl": "",
+        "virtualTourUrl": ""
+      },
+      "author": {
+        "id": "usr_victoria",
+        "name": "Victoria Vance",
+        "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150",
+        "role": "Agent",
+        "phone": "+254722111222",
+        "email": "victoria@nestlist.luxury",
+        "isVerified": true
+      },
+      "isFeatured": false,
+      "status": "active",
+      "createdAt": "2026-06-03T11:45:00.000Z",
+      "views": 184,
+      "inquiriesCount": 5,
+      "savesCount": 32
+    }
+  ],
+  "payments": [],
+  "inquiries": [],
+  "notifications": []
+}

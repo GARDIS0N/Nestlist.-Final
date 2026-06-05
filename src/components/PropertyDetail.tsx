@@ -1,31 +1,33 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  ArrowLeft, 
+  X,
   MapPin, 
   BedDouble, 
   Bath, 
   Maximize2, 
   Heart, 
   Share2, 
-  Star, 
-  Calendar, 
   Phone, 
   Mail, 
-  AlertTriangle, 
-  ChevronLeft, 
-  ChevronRight, 
-  CheckCircle,
-  Clock,
+  ShieldCheck,
+  Check,
   Sparkles,
-  Award
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  Wifi,
+  Car,
+  Shield,
+  Dribbble,
+  Play,
+  RotateCcw,
+  Loader2,
+  Copy,
+  Building,
+  Home
 } from 'lucide-react';
-import { Listing, Review, ViewingRequest, Inquiry } from '../types';
+import { Listing, ViewingRequest, Inquiry } from '../types';
 
 interface PropertyDetailProps {
   listing: Listing;
@@ -48,760 +50,480 @@ export default function PropertyDetail({
   onAddViewing,
   onAddInquiry
 }: PropertyDetailProps) {
-  const { id, title, description, propertyType, location, details, pricing, media, author, isFeatured, createdAt } = listing;
+  const { id, title, description, propertyType, location, details, pricing, media, author, isFeatured } = listing;
+
+  // Image Carousel state (Upgrade 6)
+  const [imageIndex, setImageIndex] = useState(0);
+
+  // Inquiry Form state
+  const [senderName, setSenderName] = useState('Erick Cheruiyot');
+  const [senderPhone, setSenderPhone] = useState(localStorage.getItem('nestlist_user_phone') || '0712345678');
+  const [senderEmail, setSenderEmail] = useState('mkenya@nestlist.ke');
+  const [inquiryMsg, setInquiryMsg] = useState(`Habari! I am highly interested in securing this ${propertyType} listed at ${location.neighborhood}. Let me know how we can book a physical walkthrough.`);
   
-  // Lightbox view state
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-
-  // Scheduler sidebar state
-  const [scheduleDate, setScheduleDate] = useState('2026-06-05');
-  const [scheduleTime, setScheduleTime] = useState('10:00');
-  const [schedulerNotes, setSchedulerNotes] = useState('');
-  const [scheduleSuccess, setScheduleSuccess] = useState(false);
-
-  // Inquiry form states
-  const [inquiryMsg, setInquiryMsg] = useState(`Hello, I am interested in "${title}". Please let me know when we can arrange an on-site visit.`);
+  // Custom form loading spinner & check animations (Upgrade 6)
+  const [isInquiring, setIsInquiring] = useState(false);
   const [inquirySuccess, setInquirySuccess] = useState(false);
+  
+  // Custom clipboard share states
+  const [copiedLink, setCopiedLink] = useState(false);
 
-  // Reviews states (local persistent list)
-  const [localReviews, setLocalReviews] = useState<Review[]>([
-    {
-      id: 'rev-p1',
-      listingId: id,
-      authorName: 'Erick Cheruiyot',
-      authorAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150',
-      rating: 5,
-      comment: 'An absolutely flawless masterpiece of a property. The security and the backup gen-set make this exceptionally secure for continuous remote tech workflow.',
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ]);
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState('');
-
-  // Flag/Report status state
-  const [flagModalOpen, setFlagModalOpen] = useState(false);
-  const [flagReason, setFlagReason] = useState('Duplicate Listing');
-  const [flagDetails, setFlagDetails] = useState('');
-  const [flagSuccess, setFlagSuccess] = useState(false);
-
-  // Formatted pricing string
   const formattedPrice = () => {
     const symbol = pricing.currency === 'USD' ? '$' : 'KES ';
     return `${symbol}${pricing.rent.toLocaleString()}`;
   };
 
-  const formattedDeposit = () => {
-    const symbol = pricing.currency === 'USD' ? '$' : 'KES ';
-    return `${symbol}${pricing.deposit.toLocaleString()}`;
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (media.images && media.images.length > 0) {
+      setImageIndex((imageIndex + 1) % media.images.length);
+    }
   };
 
-  // Extract similar listings
-  const similarProperties = allListings
-    .filter(item => item.id !== id && (item.propertyType === propertyType || item.location.neighborhood === location.neighborhood))
-    .slice(0, 3);
-
-  // Handle tour booking submission
-  const handleBookTour = (e: React.FormEvent) => {
-    e.preventDefault();
-    const freshRequest: ViewingRequest = {
-      id: `view-req-${Date.now()}`,
-      listingId: id,
-      listingTitle: title,
-      listingImage: media.images[0]?.url || 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&q=80&w=150',
-      agentName: author.name,
-      dateTime: `${scheduleDate}T${scheduleTime}:00.000Z`,
-      status: 'pending',
-      notes: schedulerNotes || undefined,
-      createdAt: new Date().toISOString()
-    };
-    onAddViewing(freshRequest);
-    setScheduleSuccess(true);
-    setTimeout(() => setScheduleSuccess(false), 4000);
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (media.images && media.images.length > 0) {
+      setImageIndex((imageIndex - 1 + media.images.length) % media.images.length);
+    }
   };
 
-  // Handle direct inquiry submission
+  const handleCopyLink = () => {
+    setCopiedLink(true);
+    navigator.clipboard.writeText(`https://nestlist.ke/listings/${id}`);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
   const handleInquirySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const freshInquiry: Inquiry = {
-      id: `inq-${Date.now()}`,
-      listingId: id,
-      listingTitle: title,
-      listingImage: media.images[0]?.url || 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&q=80&w=150',
-      senderName: 'Your Authenticated Name (Client)',
-      senderEmail: 'you@client-nestlist.com',
-      senderPhone: '+254 700 999 111',
-      message: inquiryMsg,
-      isReplied: false,
-      createdAt: new Date().toISOString()
-    };
-    onAddInquiry(freshInquiry);
-    setInquirySuccess(true);
+    if (!senderName || !senderPhone || !senderEmail || !inquiryMsg) {
+      alert("Please fill in all details for your inquiry.");
+      return;
+    }
+
+    if (inquiryMsg.length > 300) {
+      alert("Please shorten your message under 300 characters.");
+      return;
+    }
+
+    setIsInquiring(true);
+
+    // Simulate sending network request (duration 1500ms)
     setTimeout(() => {
-      setInquirySuccess(false);
-      setInquiryMsg('');
-    }, 4000);
+      const freshInquiry: Inquiry = {
+        id: `inq-${Date.now()}`,
+        listingId: id,
+        listingTitle: title,
+        listingImage: media.images ? (media.images[0]?.url || '') : '',
+        senderName,
+        senderEmail,
+        senderPhone,
+        message: inquiryMsg,
+        isReplied: false,
+        createdAt: new Date().toISOString()
+      };
+
+      onAddInquiry(freshInquiry);
+      setIsInquiring(false);
+      setInquirySuccess(true);
+
+      setTimeout(() => {
+        setInquirySuccess(false);
+        onBack(); // Close details dynamically after success animation
+      }, 2000);
+    }, 1500);
   };
 
-  // Review submission
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReviewComment.trim()) return;
-    const reviewObj: Review = {
-      id: `rev-sub-${Date.now()}`,
-      listingId: id,
-      authorName: 'Sarah Wambui (Tenant)',
-      authorAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100',
-      rating: newReviewRating,
-      comment: newReviewComment,
-      createdAt: new Date().toISOString()
-    };
-    setLocalReviews([reviewObj, ...localReviews]);
-    setNewReviewComment('');
+  const handleCallLandlord = () => {
+    const landlordNumber = author.phone || '+254 712 345 678';
+    alert(`Dialing Landlord/Agent ${author.name} at ${landlordNumber}.\n\n🛡️ Kenya Safekeeping Escrow Protected Direct Call.`);
   };
 
-  // Report Listing submit
-  const handleReportSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFlagSuccess(true);
-    setTimeout(() => {
-      setFlagSuccess(false);
-      setFlagModalOpen(false);
-      setFlagDetails('');
-    }, 3000);
+  // Maps amenity keywords to elegant Lucide icon components (Upgrade 6)
+  const getAmenityIcon = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('wifi') || lower.includes('internet') || lower.includes('web')) return <Wifi className="w-4 h-4 text-indigo-400" />;
+    if (lower.includes('parking') || lower.includes('garage') || lower.includes('car')) return <Car className="w-4 h-4 text-indigo-400" />;
+    if (lower.includes('security') || lower.includes('cctv') || lower.includes('guard')) return <Shield className="w-4 h-4 text-indigo-400" />;
+    if (lower.includes('gym') || lower.includes('fitness') || lower.includes('workout')) return <Dribbble className="w-4 h-4 text-indigo-400" />;
+    if (lower.includes('pool') || lower.includes('swimming') || lower.includes('water')) return <Play className="w-4 h-4 text-indigo-400 rotate-90" />;
+    return <Check className="w-4 h-4 text-emerald-400" />;
   };
 
-  const availableAmenitiesList = [
-    { id: 'wifi', label: 'WiFi Access', icon: '📶' },
-    { id: 'parking', label: 'Allocated Parking', icon: '🚗' },
-    { id: 'gym', label: 'Wellness Gym', icon: '🏋️' },
-    { id: 'pool', label: 'Swimming Pool', icon: '🏊' },
-    { id: 'security', label: '24/7 Guards & CCTV', icon: '🛡️' },
-    { id: 'water', label: 'Steady Borehole Water', icon: '🚰' },
-    { id: 'electricity_backup', label: 'Full Backup Generator', icon: '⚡' }
-  ];
-
-  const triggerLightboxOpen = (index: number) => {
-    setLightboxIndex(index);
-    setLightboxOpen(true);
-  };
+  // Find 3 similar properties excluding the current one
+  const similarProperties = allListings
+    .filter(item => item.propertyType === propertyType && item.id !== id)
+    .slice(0, 3);
 
   return (
-    <div id="property-detail-page-wrapper" className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
-      
-      {/* Back breadcrumb and Actions bar */}
-      <div className="flex items-center justify-between">
-        <button 
-          id="detail-back-btn"
-          onClick={onBack}
-          className="flex items-center gap-2 text-xs font-mono text-gray-400 hover:text-white transition-colors group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform text-brand-blue" />
-          BACK TO PORTFOLIO
-        </button>
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-end justify-center p-0 md:p-4">
+      {/* Backdrop Dismissor */}
+      <div 
+        onClick={onBack} 
+        className="absolute inset-0 cursor-zoom-out"
+        title="Close View"
+      />
 
-        <div className="flex items-center gap-2">
-          {/* Favorite */}
-          <button
-            onClick={(e) => onToggleFavorite(id, e)}
-            className={`p-2 rounded-xl transition-all flex items-center gap-1.5 text-xs ${
-              isFavorite 
-                ? 'bg-red-500/10 text-red-500 border border-red-500/30' 
-                : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-red-400'
-            }`}
+      {/* Slide-up Native Mobile Sheet */}
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 180 }}
+        className="bg-[#08080C] border-t border-white/10 w-full max-w-2xl rounded-t-[32px] overflow-hidden max-h-[94vh] overflow-y-auto pb-12 relative z-15 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] flex flex-col font-sans text-left"
+      >
+        {/* Top visual drag handle bar */}
+        <div className="w-16 h-1.5 bg-white/20 rounded-full mx-auto my-3.5 shrink-0" />
+
+        {/* Close and Share Overlay Controllers */}
+        <div className="absolute top-4 right-4 z-25 flex items-center gap-2">
+          <button 
+            onClick={handleCopyLink}
+            className="bg-black/60 hover:bg-black/85 border border-white/10 text-white rounded-full p-2 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            title="Copy Listing Link"
           >
-            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500' : ''}`} />
-            {isFavorite ? 'Saved to Space' : 'Save Asset'}
+            {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-300" />}
           </button>
-
-          {/* Report */}
-          <button
-            onClick={() => setFlagModalOpen(true)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-red-400 text-xs flex items-center gap-1 border border-white/5 transition-colors"
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            Report
-          </button>
-        </div>
-      </div>
-
-      {/* Main Title Banner and Badges */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {isFeatured && (
-            <span className="flex items-center gap-1 bg-gradient-to-r from-brand-gold to-yellow-600 text-brand-dark text-[8px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-              <Award className="w-3.5 h-3.5 text-brand-dark fill-brand-dark animate-spin" />
-              Featured Partner
-            </span>
-          )}
-          <span className="bg-brand-blue/20 text-brand-blue text-[8px] font-mono font-bold px-2 py-0.5 rounded uppercase">
-            {propertyType} Classified
-          </span>
-          <span className="bg-white/5 text-gray-300 text-[8px] font-mono px-2 py-0.5 rounded uppercase">
-            REPRESENTED BY: {listing.roleType}
-          </span>
-        </div>
-
-        <h1 className="text-2xl md:text-4xl font-serif font-bold text-white tracking-tight leading-tight">
-          {title}
-        </h1>
-
-        <div className="flex items-center gap-1.5 text-gray-400 text-xs">
-          <MapPin className="w-4 h-4 text-brand-blue shrink-0" />
-          <span>{location.address}</span>
-          <span className="text-gray-500">•</span>
-          <span className="text-brand-gold font-mono uppercase bg-brand-gold/10 px-2 py-0.5 rounded text-[10px] font-bold">
-            {location.neighborhood}
-          </span>
-        </div>
-      </div>
-
-      {/* Responsive Row-grid for Main content & Sidebars */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left 2 Cols: Media gallery & specifications */}
-        <div className="lg:col-span-2 space-y-6">
           
-          {/* GRID OF PREVIEW PHOTOS (LIGHTBOX BINDER) */}
-          <div className="grid grid-cols-3 gap-2 overflow-hidden rounded-3xl border border-white/5">
-            <div 
-              onClick={() => triggerLightboxOpen(0)}
-              className="col-span-3 h-80 relative cursor-zoom-in overflow-hidden group border-b border-white/5"
-            >
+          <button 
+            onClick={onBack}
+            className="bg-black/60 hover:bg-black/85 border border-white/10 text-white rounded-full p-2 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Photo Gallery with swipe triggers + left/right Arrows + Dot indicators (Upgrade 6) */}
+        <div className="relative h-[260px] md:h-[300px] w-full bg-[#0E0F1C] shrink-0 overflow-hidden">
+          {media.images && media.images.length > 0 ? (
+            <div className="w-full h-full relative group">
               <img 
-                src={media.images[0]?.url} 
-                alt="Main cover" 
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
+                src={media.images[imageIndex]?.url} 
+                alt={`${title} - Image ${imageIndex + 1}`} 
+                className="w-full h-full object-cover select-none"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-brand-dark/20 group-hover:bg-transparent transition-colors"></div>
-              <span className="absolute bottom-4 right-4 bg-brand-dark/80 backdrop-blur-md text-xs font-mono text-gray-300 py-1.5 px-3 rounded-xl border border-white/5 flex items-center gap-1">
-                🔍 Click to zoom
-              </span>
-            </div>
-
-            {media.images.slice(1, 4).map((img, idx) => (
-              <div 
-                key={img.id}
-                onClick={() => triggerLightboxOpen(idx + 1)}
-                className="h-28 overflow-hidden cursor-zoom-in relative group"
-              >
-                <img 
-                  src={img.url} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                  alt="Gallery thumb" 
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-brand-dark/40 py-1 text-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-gray-300 font-mono">
-                  View #{idx + 2}
+              
+              {/* Carousel arrows */}
+              {media.images.length > 1 && (
+                <div className="absolute inset-x-3.5 top-1/2 -translate-y-1/2 flex justify-between z-10 pointer-events-none">
+                  <button
+                    onClick={handlePrevImage}
+                    className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center border border-white/15 pointer-events-auto active:scale-95 transition-all"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleNextImage}
+                    className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center border border-white/15 pointer-events-auto active:scale-95 transition-all"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
+              )}
+
+              {/* Dot Indicators */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+                {media.images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setImageIndex(idx)}
+                    className={`w-2 h-2 rounded-full transition-all ${imageIndex === idx ? 'bg-violet-400 w-4' : 'bg-white/40'}`}
+                  />
+                ))}
               </div>
-            ))}
+            </div>
+          ) : (
+            <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500 font-mono text-xs">
+              No photo available
+            </div>
+          )}
+
+          {/* Top backdrop mask */}
+          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
+
+          {/* Bottom mask */}
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#08080C] via-[#08080C]/70 to-transparent pointer-events-none" />
+
+          {/* Carousel contents */}
+          <div className="absolute bottom-3 inset-x-4 text-left space-y-1 z-10">
+            <div className="flex flex-wrap items-center gap-2">
+              {isFeatured && (
+                <span className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-black text-[9px] font-black px-2.5 py-0.5 rounded uppercase tracking-wider font-syne">
+                  <Sparkles className="w-3 h-3 fill-black text-black" />
+                  PREMIUM PARTNER
+                </span>
+              )}
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black px-2.5 py-0.5 rounded uppercase font-syne tracking-wider">
+                {propertyType}
+              </span>
+            </div>
+
+            <h1 className="text-xl md:text-2xl font-black font-syne text-white tracking-tight leading-snug">
+              {title}
+            </h1>
+
+            <div className="flex items-center gap-1 text-slate-300 text-xs">
+              <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="font-semibold">{location.address}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Content body layout */}
+        <div className="p-6 text-left space-y-6">
+          
+          {/* Main Price & Property Metrics row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-5">
+            <div>
+              <span className="block text-[10px] text-slate-500 uppercase font-mono font-black tracking-widest">MONTHLY RENT TERMS</span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-3xl font-syne font-black bg-gradient-to-r from-violet-450 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent">
+                  {formattedPrice()}
+                </span>
+                <span className="text-xs text-slate-400 uppercase font-black">/ month</span>
+              </div>
+              <p className="text-xs text-slate-400 font-semibold block mt-1">
+                Security Guarantee Deposit: {pricing.currency === 'USD' ? '$' : 'KES'} {pricing.deposit.toLocaleString()}
+              </p>
+            </div>
+
+            {/* Quick specs boxes */}
+            <div className="flex gap-2 text-[11px] font-bold font-dmsans text-slate-300">
+              <div className="bg-[#121324] border border-white/5 px-3 py-2 rounded-2xl text-center min-w-[70px]">
+                <span className="block text-[8px] text-slate-500 uppercase font-mono tracking-wider">BEDS</span>
+                <span>{details.bedrooms} Rooms</span>
+              </div>
+              <div className="bg-[#121324] border border-white/5 px-3 py-2 rounded-2xl text-center min-w-[70px]">
+                <span className="block text-[8px] text-slate-500 uppercase font-mono tracking-wider">BATHS</span>
+                <span>{details.bathrooms} Bath</span>
+              </div>
+              <div className="bg-[#121324] border border-white/5 px-3 py-2 rounded-2xl text-center min-w-[70px]">
+                <span className="block text-[8px] text-slate-500 uppercase font-mono tracking-wider">SIZE</span>
+                <span>{details.size} m²</span>
+              </div>
+            </div>
           </div>
 
-          {/* ROOM SPECS AND AREA TOGGLES */}
-          <div className="p-5 glass-premium rounded-2xl flex flex-wrap justify-between items-center gap-4 text-xs font-mono text-gray-300 border border-white/5">
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold">
-                🛌
-              </span>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase block">Bedrooms layout</span>
-                <span className="text-white font-bold">{details.bedrooms} Rooms Spec</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold">
-                🛁
-              </span>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase block">Bathrooms layouts</span>
-                <span className="text-white font-bold">{details.bathrooms} Baths</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold">
-                📐
-              </span>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase block font-mono">Floor Area Net</span>
-                <span className="text-white font-bold">{details.size} {details.sizeUnit}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold">
-                🛋️
-              </span>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase block">Interior Decor</span>
-                <span className="text-white font-bold">{details.isFurnished ? 'Fully Furnished' : 'Unfurnished'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* DESCRIPTION TEXT */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-serif font-bold text-white tracking-tight border-b border-white/5 pb-2">Description narrative</h3>
-            <p className="text-xs text-gray-300 leading-relaxed font-sans text-justify">
-              {description}
+          {/* Description */}
+          <div className="space-y-2">
+            <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Category Description</h2>
+            <p className="text-sm text-slate-300 leading-relaxed font-semibold">
+              {description || "Authentic luxury metropolitan real estate portfolio hand-inspected under Safekeeping procedures in Nairobi."}
             </p>
           </div>
 
-          {/* AMENITIES CHECK GRID */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-serif font-bold text-white tracking-tight border-b border-white/5 pb-2">Asset Amenities Inclusions</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {details.amenities.map(amenId => {
-                const spec = availableAmenitiesList.find(a => a.id === amenId) || { label: amenId.toUpperCase(), icon: '🏡' };
-                return (
-                  <div 
-                    key={amenId} 
-                    className="p-3 bg-brand-card/40 border border-white/5 rounded-xl flex items-center gap-2 text-xs"
-                  >
-                    <span className="text-base leading-none">{spec.icon}</span>
-                    <span className="text-gray-300 font-semibold">{spec.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* VECTOR MAP EMBED COMPONENT */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-serif font-bold text-white tracking-tight border-b border-white/5 pb-2">Location mapping & neighborhood</h3>
-            
-            <div className="relative h-56 bg-slate-900 rounded-2xl border border-white/5 overflow-hidden flex flex-col justify-between p-4">
-              <div className="absolute inset-0 opacity-15" style={{
-                backgroundImage: 'radial-gradient(ellipse at center, rgba(59,130,246,0.3) 0%, transparent 70%), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-                backgroundSize: '100%, 20px 20px, 20px 20px'
-              }}></div>
-
-              <div className="z-10 flex justify-between items-start">
-                <span className="text-[10px] bg-brand-dark/80 px-2.5 py-1.5 rounded-lg border border-white/5 font-mono text-gray-300">
-                  GIS Marker: {location.coordinates.lat}, {location.coordinates.lng}
-                </span>
-                
-                <span className="text-[10px] bg-brand-blue text-white px-2 py-1 rounded">
-                  {location.neighborhood} Environs
-                </span>
-              </div>
-
-              {/* Simple Vector pin drop animation on mock map */}
-              <div className="flex-1 flex items-center justify-center relative">
-                <div className="relative">
-                  <div className="absolute -inset-4 bg-brand-blue/30 rounded-full animate-ping"></div>
-                  <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="z-10 bg-brand-dark/95 backdrop-blur-md p-3 rounded-xl border border-white/5 grid grid-cols-3 gap-2 text-center text-[10px]">
-                <div>
-                  <span className="text-gray-500 uppercase font-mono block">Zone Rating</span>
-                  <span className="text-brand-gold font-bold">⭐⭐⭐⭐⭐ 5.0</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 uppercase font-mono block">Transit distance</span>
-                  <span className="text-gray-300 font-bold">12 Mins to CBD</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 uppercase font-mono block">Borehole flow</span>
-                  <span className="text-green-400 font-bold">Continuous 24h</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* HOUSE REVIEW SECTION */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-serif font-bold text-white tracking-tight border-b border-white/5 pb-2">Active Tenant Critiques ({localReviews.length})</h3>
-            
-            {/* Review form */}
-            <form onSubmit={handleAddReview} className="glass-premium p-4 rounded-xl border border-white/5 space-y-3">
-              <span className="block text-[10px] text-gray-400 uppercase font-mono">Submit your verified inspection feedback</span>
-              
-              <div className="flex gap-4 items-center">
-                <span className="text-xs text-gray-300">Your score:</span>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setNewReviewRating(star)}
-                      className="text-sm transition-transform hover:scale-115"
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-                <span className="text-xs font-mono text-brand-gold font-bold">({newReviewRating}.0 / 5.0)</span>
-              </div>
-
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newReviewComment}
-                  onChange={(e) => setNewReviewComment(e.target.value)}
-                  placeholder="Review comment: details security, water pressure, layout veracity..."
-                  className="flex-1 bg-brand-dark/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-brand-blue"
-                />
-                <button 
-                  type="submit"
-                  className="bg-brand-blue text-white hover:bg-blue-600 px-4 py-2 rounded-xl text-xs font-bold font-mono transition-transform active:scale-95"
-                >
-                  Post Review
-                </button>
-              </div>
-            </form>
-
-            {/* List reviews */}
+          {/* Custom Vetted Amenities Grid (Upgrade 6) */}
+          {details.amenities && details.amenities.length > 0 && (
             <div className="space-y-3">
-              {localReviews.map(rev => (
-                <div key={rev.id} className="p-4 bg-brand-card/40 border border-white/5 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <img src={rev.authorAvatar} alt="user" className="w-6 h-6 rounded-full object-cover border border-white/10" referrerPolicy="no-referrer" />
-                      <span className="text-xs font-bold text-white">{rev.authorName}</span>
+              <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Amenity Infrastructure Vetting</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {details.amenities.map(am => (
+                  <div key={am} className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#121324] border border-white/5">
+                    <div className="p-1.5 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                      {getAmenityIcon(am)}
                     </div>
-                    <div className="flex gap-1 text-[10px] items-center">
-                      <span className="text-brand-gold">⭐</span>
-                      <span className="text-gray-300 font-mono font-bold">{rev.rating}.0</span>
-                    </div>
+                    <span className="text-[11px] font-bold text-slate-200 capitalize truncate font-dmsans">{am}</span>
                   </div>
-                  <p className="text-xs text-gray-300 italic">"{rev.comment}"</p>
-                  <p className="text-[9px] text-gray-500 font-mono text-right">{new Date(rev.createdAt).toLocaleDateString()}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Google Maps Styled Preview Widget (Upgrade 6) */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Real-world Geospatial Locator</h2>
+              <span className="text-[9px] text-[#4CAF50] font-mono font-bold tracking-wide flex items-center gap-0.5 uppercase">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Satellites Synced
+              </span>
+            </div>
+            
+            <div className="relative h-[160px] rounded-2xl overflow-hidden border border-white/10 bg-slate-900">
+              {/* Dark Map Mockup with beautiful filters */}
+              <img 
+                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=650&h=200"
+                alt="Static Vetted Coordinates"
+                className="w-full h-full object-cover brightness-[0.35] contrast-[1.25] saturate-[0.8]"
+              />
+              {/* Pulsing beacon marker overlay directly centers */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div className="relative">
+                  <span className="absolute -top-3.5 -left-3.5 w-10.5 h-10.5 bg-indigo-500/20 border-2 border-indigo-450 rounded-full animate-ping" />
+                  <div className="w-3.5 h-3.5 bg-indigo-400 border border-white rounded-full shadow-lg relative z-10" />
                 </div>
-              ))}
+                <div className="bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[9px] font-bold font-mono text-indigo-300 mt-2.5 shadow-xl uppercase">
+                  Vetted Sector: {location.neighborhood || 'Nairobi'}
+                </div>
+              </div>
             </div>
           </div>
 
-        </div>
-
-        {/* Right 1 Col: Price/Deposit, Booking Form Scheduler */}
-        <div className="space-y-6">
-          
-          {/* STICKY RATING LEDGER HIGHLIGHT BAR */}
-          <div className="glass-premium p-6 rounded-3xl border border-brand-gold/30 ring-1 ring-brand-gold/10 shadow-lg shadow-brand-gold/5 space-y-4">
-            <div>
-              <span className="text-[10px] text-gray-400 font-mono uppercase tracking-wider block">Authorized Lease terms</span>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-3xl font-serif font-black text-white">{formattedPrice()}</span>
-                <span className="text-xs text-gray-400 font-mono uppercase">/ {pricing.frequency}</span>
-              </div>
-              <span className="text-[11px] text-gray-300 font-mono block mt-1.5">Refundable Bond: {formattedDeposit()}</span>
-            </div>
-
-            {/* REPRESENTATIVE CARD */}
-            <div className="p-3 bg-brand-dark/60 rounded-2xl border border-white/5 flex items-center gap-3">
+          {/* Vetted Representative Card */}
+          <div className="bg-[#121324] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <img 
-                src={author.avatar} 
+                src={author.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100'} 
                 alt={author.name} 
-                className="w-10 h-10 rounded-xl object-cover border border-white/10" 
+                className="w-11 h-11 rounded-full object-cover border border-[#08080C] shrink-0"
                 referrerPolicy="no-referrer"
               />
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-bold text-white block truncate">{author.name}</span>
-                <span className="text-[9px] text-gray-500 font-mono uppercase block">{author.role} • Premium Partner</span>
+              <div className="leading-tight">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-extrabold text-white">{author.name}</span>
+                  {author.isVerified && (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-450 border border-emerald-500/30 font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider flex items-center gap-0.5">
+                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> VETTED
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-slate-450 uppercase font-mono tracking-wider block mt-0.5">Kenya Licensed Escrow {author.role || 'Agent'}</span>
               </div>
-              {author.isVerified && (
-                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-mono px-1.5 py-0.5 rounded uppercase font-bold">
-                  KYC Verified
-                </span>
-              )}
             </div>
 
-            {/* Direct Instant Contact form */}
-            <form onSubmit={handleInquirySubmit} className="space-y-2 border-t border-white/5 pt-4">
-              <span className="block text-[10px] text-gray-400 uppercase font-mono mb-1">Instant Inquiry Messenger</span>
-              
-              <textarea 
-                value={inquiryMsg}
-                onChange={(e) => setInquiryMsg(e.target.value)}
-                rows={3}
-                required
-                className="w-full bg-brand-dark/50 border border-white/10 rounded-xl p-2 md:p-3 text-[11px] text-white outline-none focus:border-brand-blue resize-none"
-              ></textarea>
-
-              <button
-                type="submit"
-                className="w-full bg-brand-blue hover:bg-blue-600 text-white font-bold py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                Submit Direct message
-              </button>
-
-              <AnimatePresence>
-                {inquirySuccess && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] rounded-lg text-center font-mono mt-1"
-                  >
-                    🚀 Inquiry sent securely with Resend verification.
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </form>
-
-            {/* PHYSICAL VIEWING SCHEDULER WIDGET */}
-            <form onSubmit={handleBookTour} className="space-y-3.5 border-t border-white/5 pt-4">
-              <span className="block text-[10px] text-gray-400 uppercase font-mono">Coordinate Site Tour</span>
-              
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="block text-[9px] text-gray-500 uppercase font-mono mb-1">Target Date</label>
-                  <input 
-                    type="date" 
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    required
-                    className="w-full bg-brand-dark border border-white/10 rounded-xl p-2 text-xs text-white outline-none focus:border-brand-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[9px] text-gray-500 uppercase font-mono mb-1">Term Time</label>
-                  <input 
-                    type="time" 
-                    value={scheduleTime}
-                    required
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full bg-brand-dark border border-white/10 rounded-xl p-2 text-xs text-white outline-none focus:border-brand-blue"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[9px] text-gray-500 uppercase font-mono mb-1">Scheduler instructions (Optional)</label>
-                <input 
-                  type="text" 
-                  value={schedulerNotes}
-                  onChange={(e) => setSchedulerNotes(e.target.value)}
-                  placeholder="Need wheelchair access/parking spot..."
-                  className="w-full bg-brand-dark border border-white/10 rounded-xl p-2 text-xs text-white outline-none focus:border-brand-blue"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-brand-gold to-amber-600 text-brand-dark font-sans font-black py-2.5 rounded-xl text-xs hover:shadow-lg hover:shadow-brand-gold/10 transition-all flex items-center justify-center gap-1.5"
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Schedule Physical Tour
-              </button>
-
-              <AnimatePresence>
-                {scheduleSuccess && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] rounded-xl text-center space-y-1"
-                  >
-                    <p className="font-bold flex items-center justify-center gap-1">
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
-                      Session Pending Confirmation
-                    </p>
-                    <p className="text-[9px] text-gray-400 leading-none">We notified the authorized custodian agent.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </form>
-
+            {/* Quick Call Landlord button */}
+            <button
+              onClick={handleCallLandlord}
+              className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-black font-syne font-black rounded-xl text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20"
+            >
+              <Phone className="w-3.5 h-3.5 text-black fill-black" />
+              Call Partner
+            </button>
           </div>
 
-          {/* SIMILAR PROPERTIES CAROUSEL PREVIEWS */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-bold text-white tracking-tight uppercase font-mono text-gray-400 border-b border-white/5 pb-2">Matching recommendations</h4>
-            <div className="space-y-3">
-              {similarProperties.length === 0 ? (
-                <div className="text-center py-4 text-gray-600 text-xs font-mono">
-                  No overlapping records found
-                </div>
-              ) : (
-                similarProperties.map(prop => (
-                  <div
-                    key={prop.id}
-                    onClick={() => onSelectSimilar(prop.id)}
-                    className="p-2.5 bg-brand-card/40 border border-white/5 hover:border-white/10 rounded-2xl flex gap-3 cursor-pointer group transition-all"
+          {/* Similar Properties dynamic section (Upgrade 6) */}
+          {similarProperties.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Similar Properties You May Like</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {similarProperties.map(similar => (
+                  <div 
+                    key={similar.id}
+                    onClick={() => onSelectSimilar(similar.id)}
+                    className="group/sim bg-[#121324] hover:bg-[#19192f] border border-white/5 rounded-2xl p-3 text-left cursor-pointer transition-all duration-300"
                   >
-                    <img 
-                      src={prop.media.images[0]?.url} 
-                      alt={prop.title} 
-                      className="w-14 h-14 rounded-lg object-cover border border-white/5 group-hover:scale-102 transition-transform" 
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="flex-1 min-w-0 pr-1 py-0.5 flex flex-col justify-between">
-                      <h5 className="text-[11px] font-bold text-gray-200 group-hover:text-brand-blue truncate transition-colors leading-tight">
-                        {prop.title}
-                      </h5>
-                      <span className="text-[9px] font-mono text-gray-500 block truncate">{prop.location.neighborhood}</span>
-                      <span className="text-[10px] font-serif font-black text-brand-gold mt-1 leading-none block">
-                        {prop.pricing.currency === 'USD' ? '$' : 'KSh '}{prop.pricing.rent.toLocaleString()} / mo
+                    <div className="relative h-[90px] rounded-xl overflow-hidden mb-2">
+                      <img 
+                        src={similar.media.images?.[0]?.url} 
+                        alt={similar.title} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover/sim:scale-105" 
+                      />
+                      <span className="absolute bottom-1 right-1 bg-black/75 px-1.5 py-0.5 text-[8px] font-black rounded text-indigo-300 font-mono">
+                        {similar.pricing.currency === 'USD' ? '$' : 'KSh'}{similar.pricing.rent.toLocaleString()}
                       </span>
                     </div>
+                    <h4 className="text-[11px] font-extrabold text-white font-syne leading-tight truncate group-hover/sim:text-indigo-400 transition-colors">
+                      {similar.title}
+                    </h4>
+                    <span className="text-[9px] text-slate-500 truncate block font-dmsans font-semibold mt-0.5">{similar.location.neighborhood}</span>
                   </div>
-                ))
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-        </div>
-
-      </div>
-
-      {/* LIGHTBOX BACKDROP PANEL */}
-      <AnimatePresence>
-        {lightboxOpen && (
-          <div className="fixed inset-0 z-[110] bg-brand-dark/95 backdrop-blur-md flex flex-col justify-between p-4">
+          {/* Inquiry form */}
+          <form onSubmit={handleInquirySubmit} className="space-y-3.5 pt-5 border-t border-white/5">
+            <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Submit Vetted Tenant Inquiry</h2>
             
-            {/* Header overlay */}
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-gray-400 font-mono">Zoom Gallery Asset #{lightboxIndex + 1} of {media.images.length}</span>
-              <button 
-                onClick={() => setLightboxOpen(false)}
-                className="text-xs text-gray-100 hover:text-white bg-white/5 px-4 py-2 border border-white/5 rounded-xl hover:bg-white/10"
-              >
-                Exit Zoom ✕
-              </button>
-            </div>
-
-            {/* Slider container */}
-            <div className="flex-1 flex items-center justify-between gap-4 max-w-4xl mx-auto w-full relative">
-              <button
-                onClick={() => setLightboxIndex((lightboxIndex - 1 + media.images.length) % media.images.length)}
-                className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white"
-              >
-                ◀
-              </button>
-
-              <div className="flex-1 h-[65vh] flex items-center justify-center overflow-hidden rounded-2xl relative">
-                <img 
-                  src={media.images[lightboxIndex]?.url} 
-                  className="max-h-full max-w-full object-contain rounded-xl" 
-                  alt="Zoom detail" 
-                  referrerPolicy="no-referrer"
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Name field */}
+              <div className="space-y-1.5">
+                <label className="block text-[9px] text-slate-500 font-mono font-bold uppercase tracking-wider">Your Full Name</label>
+                <input 
+                  type="text" 
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="John Mwangi"
+                  required
+                  className="w-full bg-[#121324] border border-white/5 hover:border-white/10 focus:border-violet-500 rounded-xl p-3 text-xs text-white outline-none font-bold font-dmsans transition-all"
                 />
               </div>
 
-              <button
-                onClick={() => setLightboxIndex((lightboxIndex + 1) % media.images.length)}
-                className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white"
-              >
-                ▶
-              </button>
-            </div>
-
-            {/* Thumb indexes */}
-            <div className="flex justify-center gap-2 overflow-x-auto whitespace-nowrap max-w-lg mx-auto py-2">
-              {media.images.map((img, idx) => (
-                <button
-                  key={img.id}
-                  onClick={() => setLightboxIndex(idx)}
-                  className={`w-14 h-10 rounded-md overflow-hidden border ${
-                    idx === lightboxIndex ? 'border-brand-blue ring-1 ring-brand-blue/20' : 'border-transparent opacity-60'
-                  }`}
-                >
-                  <img src={img.url} className="w-full h-full object-cover" alt="Thumb" referrerPolicy="no-referrer" />
-                </button>
-              ))}
-            </div>
-
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* FLAG/REPORT SYSTEM MODAL */}
-      <AnimatePresence>
-        {flagModalOpen && (
-          <div className="fixed inset-0 z-100 bg-brand-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-md glass-premium rounded-3xl p-6 border border-white/10 shadow-2xl relative"
-            >
-              <button 
-                onClick={() => setFlagModalOpen(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-
-              <div className="text-center mb-5">
-                <div className="w-10 h-10 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2 font-bold text-lg">
-                  ⚠
-                </div>
-                <h4 className="text-lg font-bold font-serif text-white">Flag Property Listing</h4>
-                <p className="text-xs text-gray-400 mt-1 uppercase font-mono">Platform Integrity Moderation Check</p>
+              {/* Phone field */}
+              <div className="space-y-1.5">
+                <label className="block text-[9px] text-slate-500 font-mono font-bold uppercase tracking-wider">M-Pesa Mobile Number</label>
+                <input 
+                  type="tel" 
+                  value={senderPhone}
+                  onChange={(e) => setSenderPhone(e.target.value)}
+                  placeholder="0712345678"
+                  required
+                  className="w-full bg-[#121324] border border-white/5 hover:border-white/10 focus:border-violet-500 rounded-xl p-3 text-xs text-white outline-none font-bold font-dmsans transition-all"
+                />
               </div>
 
-              <form onSubmit={handleReportSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] text-gray-400 uppercase font-mono mb-1">Violation Reason</label>
-                  <select 
-                    value={flagReason}
-                    onChange={(e) => setFlagReason(e.target.value)}
-                    className="w-full bg-brand-dark border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-brand-blue"
-                  >
-                    <option value="Duplicate Listing">Duplicate Listing (Spam)</option>
-                    <option value="Inaccurate Price">Inaccurate Pricing or Hidden Broker fees</option>
-                    <option value="Scam/Fraud Activity">Suspected Scam details / Fraudulent landlord</option>
-                    <option value="Stale Inventory">Already rented / Unavailable inventory</option>
-                    <option value="Incomplete details">Misrepresented visuals or details</option>
-                  </select>
-                </div>
+              {/* Email field */}
+              <div className="space-y-1.5">
+                <label className="block text-[9px] text-slate-500 font-mono font-bold uppercase tracking-wider">Email Address</label>
+                <input 
+                  type="email" 
+                  value={senderEmail}
+                  onChange={(e) => setSenderEmail(e.target.value)}
+                  placeholder="client@nestlist.ke"
+                  required
+                  className="w-full bg-[#121324] border border-white/5 hover:border-white/10 focus:border-violet-500 rounded-xl p-3 text-xs text-white outline-none font-bold font-dmsans transition-all"
+                />
+              </div>
+            </div>
 
-                <div>
-                  <label className="block text-[10px] text-gray-400 uppercase font-mono mb-1">Incident Report specifics</label>
-                  <textarea 
-                    value={flagDetails}
-                    onChange={(e) => setFlagDetails(e.target.value)}
-                    rows={3}
-                    required
-                    placeholder="Provide web page links, conflicting phone numbers, or details verifying this claim..."
-                    className="w-full bg-brand-dark/50 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-brand-blue resize-none"
-                  ></textarea>
-                </div>
+            {/* Custom message field with Character Counter (Upgrade 6) */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-[9px] font-mono font-bold uppercase tracking-wider">
+                <span className="text-slate-500">Personalized Message parameters:</span>
+                <span className={inquiryMsg.length > 270 ? 'text-rose-400' : 'text-slate-500'}>
+                  {inquiryMsg.length} / 300 Characters
+                </span>
+              </div>
+              <textarea 
+                value={inquiryMsg}
+                onChange={(e) => setInquiryMsg(e.target.value.slice(0, 300))}
+                rows={3}
+                required
+                placeholder="Submit custom terms or viewing times directly to landlord..."
+                className="w-full bg-[#121324] border border-white/5 hover:border-white/10 focus:border-violet-500 rounded-xl p-3 text-xs text-white outline-none font-bold font-dmsans transition-all resize-none leading-relaxed"
+              />
+            </div>
 
-                <div className="flex gap-2">
-                  <button 
-                    type="button" 
-                    onClick={() => setFlagModalOpen(false)}
-                    className="flex-1 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl border border-white/5 py-2 text-xs"
-                  >
-                    Cancel claim
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="flex-1 bg-red-500 text-white hover:bg-red-600 rounded-xl py-2 text-xs font-bold"
-                  >
-                    Submit Case
-                  </button>
-                </div>
+            {/* "Send Inquiry" button with loading spinner & disabled states (Upgrade 6) */}
+            <button
+              type="submit"
+              disabled={isInquiring || inquirySuccess}
+              className="w-full py-3.5 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 hover:brightness-110 disabled:opacity-50 text-white font-syne font-black rounded-xl text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer shadow-lg shadow-violet-900/35"
+            >
+              {isInquiring ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <span>TRANSMITTING DETAILS...</span>
+                </>
+              ) : inquirySuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400 animate-heart-pulse" />
+                  <span>DISPATCHED!</span>
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 text-white fill-white/10" />
+                  <span>Send Vetted Inquiry Securely</span>
+                </>
+              )}
+            </button>
 
-                <AnimatePresence>
-                  {flagSuccess && (
-                     <motion.p 
-                       initial={{ opacity: 0 }}
-                       animate={{ opacity: 1 }}
-                       className="text-center font-mono text-[10px] text-green-400 pt-1"
-                     >
-                       ✓ Case submitted. Admin moderator will review in 24 hours.
-                     </motion.p>
-                  )}
-                </AnimatePresence>
+            <AnimatePresence>
+              {inquirySuccess && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-[#4CAF50]/10 border border-[#4CAF50]/20 rounded-2xl p-3 text-center text-xs font-bold text-emerald-400 flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4.5 h-4.5 text-emerald-400 bg-emerald-450/20 p-0.5 rounded-full" />
+                  <span>Excellent! Inquiry submitted securely. Returning to browsing flow...</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </form>
 
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
+        </div>
+      </motion.div>
     </div>
   );
 }

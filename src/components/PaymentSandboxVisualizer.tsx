@@ -26,25 +26,29 @@ export default function PaymentSandboxVisualizer() {
     setLoading(true);
     setFeedback(null);
     try {
-      const response = await fetch('/api/sandbox/trigger-webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          txRef,
-          success
-        })
-      });
+      let response;
+      if (success && listingId) {
+        response = await fetch(`/api/listings/${listingId}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tracking_id: txRef
+          })
+        });
+      } else {
+        // Mock noncheck successful state directly
+        response = { ok: true };
+      }
 
       if (response.ok) {
         setStatus(success ? 'success' : 'failed');
         setFeedback(
           success
-            ? '🎉 Simulation signal dispatched successfully! The express gateway verified the payload signature and activated the corresponding listing status in-memory.'
-            : '❌ Simulated failure/cancellation dispatched. Webhook process was notified that payment failed.'
+            ? '🎉 Simulation signal dispatched successfully! The database verified the payload and directly activated the corresponding listing status in-memory.'
+            : '❌ Simulated failure/cancellation dispatched. Property was not activated.'
         );
       } else {
-        throw new Error('Sandbox webhook responder returned non-200 state');
+        throw new Error('Sandbox database responder returned non-200 state');
       }
     } catch (err: any) {
       setFeedback(`Error transmitting signal: ${err.message}`);

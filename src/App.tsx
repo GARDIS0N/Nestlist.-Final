@@ -17,18 +17,10 @@ import {
   AlertCircle,
   HelpCircle,
   PlusCircle,
-  ArrowRight
+  ArrowRight,
+  CheckCircle
 } from 'lucide-react';
 
-import { 
-  INITIAL_LISTINGS, 
-  INITIAL_INQUIRIES, 
-  INITIAL_VIEWINGS, 
-  INITIAL_REVIEWS, 
-  INITIAL_NOTIFICATIONS, 
-  INITIAL_TRANSACTIONS, 
-  INITIAL_REPORTS 
-} from './data/mockProperties';
 
 import { 
   Listing, 
@@ -52,22 +44,26 @@ import ListPropertyFlow from './components/ListPropertyFlow';
 import PropertyDetail from './components/PropertyDetail';
 import Dashboards from './components/Dashboards';
 import PaymentSandboxVisualizer from './components/PaymentSandboxVisualizer';
+import Login from './components/Login';
+
+import { checkExpiredListings } from './utils/paymentAndNotify';
 
 export default function App() {
   
   // GENERAL ACCOUNT STATES (Fideli-sync)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentRole, setCurrentRole] = useState<UserRole>('Tenant');
-  const [activeTab, setActiveTab] = useState<'listings' | 'dashboard'>('listings');
+  const [activeTab, setActiveTab ] = useState<'home' | 'search' | 'dashboard' | 'profile'>('home');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
 
   // CORE REGISTRY (Simulated localized DB)
-  const [listings, setListings] = useState<Listing[]>(INITIAL_LISTINGS);
-  const [favorites, setFavorites] = useState<string[]>(['list-1', 'list-3']);
-  const [viewingRequests, setViewingRequests] = useState<ViewingRequest[]>(INITIAL_VIEWINGS);
-  const [inquiries, setInquiries] = useState<Inquiry[]>(INITIAL_INQUIRIES);
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [reports, setReports] = useState<Report[]>(INITIAL_REPORTS);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [viewingRequests, setViewingRequests] = useState<ViewingRequest[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   
   // SAVED SEARCH ENGINE STATES
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([
@@ -133,14 +129,54 @@ export default function App() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [viewFormat, setViewFormat] = useState<'grid' | 'list'>('grid');
   const [splitMapMode, setSplitMapMode] = useState(false);
+  const [mapViewType, setMapViewType] = useState<'street' | 'satellite'>('street');
 
-  // FILTERS CRITERIA
-  const [searchLocation, setSearchLocation] = useState('');
+  // FILTERS CRITERIA WITH CACHE (Upgrade 9)
+  const [searchLocation, setSearchLocation] = useState(() => localStorage.getItem('nestlist_cache_location') || '');
   const [searchCounty, setSearchCounty] = useState<string>('all');
-  const [searchPropertyType, setSearchPropertyType] = useState<string>('all');
-  const [searchPriceRange, setSearchPriceRange] = useState<number>(500000); // Max cap
-  const [searchBedrooms, setSearchBedrooms] = useState<number | 'all'>('all');
+  const [searchPropertyType, setSearchPropertyType] = useState(() => localStorage.getItem('nestlist_cache_propertyType') || 'all');
+  const [searchPriceRange, setSearchPriceRange] = useState<number>(() => {
+    const cached = localStorage.getItem('nestlist_cache_priceRange');
+    return cached ? parseInt(cached, 10) : 500000;
+  });
+  const [searchBedrooms, setSearchBedrooms] = useState<number | 'all' | '5plus'>(() => {
+    const cached = localStorage.getItem('nestlist_cache_bedrooms');
+    if (cached === 'all' || cached === '5plus') return cached;
+    return cached ? (parseInt(cached, 10) as any) : 'all';
+  });
   const [sortOrder, setSortOrder] = useState<'newest' | 'price-low' | 'price-high' | 'popular'>('newest');
+
+  // Performance tracking & pagination states (Upgrade 9 & 12)
+  const [isListingsLoading, setIsListingsLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const cached = localStorage.getItem('nestlist_recent_searches');
+      return cached ? JSON.parse(cached) : ["Kilimani", "Westlands", "Karen"];
+    } catch {
+      return ["Kilimani", "Westlands", "Karen"];
+    }
+  });
+
+  const handleSearchSubmit = (loc: string) => {
+    setSearchLocation(loc);
+    setShowSearchSuggestions(false);
+    if (loc.trim() && !recentSearches.includes(loc)) {
+      const updated = [loc, ...recentSearches.slice(0, 4)];
+      setRecentSearches(updated);
+      localStorage.setItem('nestlist_recent_searches', JSON.stringify(updated));
+    }
+  };
+
+  // Automatically save state metrics in cache
+  useEffect(() => {
+    localStorage.setItem('nestlist_cache_location', searchLocation);
+    localStorage.setItem('nestlist_cache_propertyType', searchPropertyType);
+    localStorage.setItem('nestlist_cache_priceRange', searchPriceRange.toString());
+    localStorage.setItem('nestlist_cache_bedrooms', searchBedrooms.toString());
+    setVisibleCount(12); // reset view on changed inputs
+  }, [searchLocation, searchPropertyType, searchPriceRange, searchBedrooms]);
 
   // ADVANCED SPECS FILTERS
   const [filterAmenities, setFilterAmenities] = useState<string[]>([]);
@@ -148,30 +184,76 @@ export default function App() {
   const [filterPetFriendly, setFilterPetFriendly] = useState(false);
   const [filterDistanceFromCenter, setFilterDistanceFromCenter] = useState<number>(30); // Max distance KMs
 
-  // FULL-STACK SERVER INTEGRATION HARNESS
+  // FULL-STACK SERVER INTEGRATION HARNESS (with loading tracking)
   const refreshServerListings = () => {
     fetch('/api/listings')
       .then(res => res.json())
       .then(data => {
-        if (data && data.success && data.listings && data.listings.length > 0) {
-          setListings(prev => {
-            // Merge serverside array on top of client mockup
-            const serverMap = new Map(data.listings.map((l: any) => [l.id, l]));
-            const localMerged = prev.map(l => serverMap.get(l.id) || l);
-            const existingIds = new Set(prev.map(l => l.id));
-            const brandNew = data.listings.filter((l: any) => !existingIds.has(l.id));
-            return [...brandNew, ...localMerged];
-          });
+        if (data && data.success && data.listings) {
+          setListings(data.listings);
         }
+        setIsListingsLoading(false);
       })
-      .catch(err => console.warn("API Server ping waiting...", err));
+      .catch(err => {
+        console.warn("API Server ping waiting...", err);
+        setIsListingsLoading(false);
+      });
   };
 
   useEffect(() => {
+    // Identity auto-login from local token on layout mount
+    const token = localStorage.getItem('nestlist_token');
+    if (token && token !== "MOCK_TOKEN") {
+      fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          setCurrentRole(data.user.role);
+          const savedPhone = localStorage.getItem('nestlist_user_phone') || '';
+          setUserProfile(prev => ({
+            ...prev,
+            fullName: data.user.name,
+            contactEmail: data.user.email,
+            contactPhone: savedPhone || data.user.phone || '',
+            kycStatus: data.user.role === 'Agent' || data.user.role === 'Landlord' ? 'verified' : 'pending'
+          }));
+          setIsLoggedIn(true);
+        } else {
+          localStorage.removeItem('nestlist_token');
+        }
+      })
+      .catch(err => console.error("Identity auto-login error:", err));
+    }
+
     refreshServerListings();
     const interval = setInterval(refreshServerListings, 4000);
-    return () => clearInterval(interval);
+
+    // Dynamic event to open listing details directly from payment step 8 success screen
+    const handleOpenDetails = (e: Event) => {
+      const listingId = (e as CustomEvent).detail;
+      if (listingId) {
+        setSelectedListingId(listingId);
+        setActiveTab('home'); // focus home tab to present listing modal details
+      }
+    };
+    window.addEventListener('open-listing-details', handleOpenDetails);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('open-listing-details', handleOpenDetails);
+    };
   }, []);
+
+  // Run passive listing expiry audits once listings populate
+  useEffect(() => {
+    if (listings.length > 0) {
+      checkExpiredListings(listings, setListings);
+    }
+  }, [listings.length]);
 
   // Intercept and load safe sandbox visualizer component
   const isSandboxRoute = typeof window !== 'undefined' && window.location.pathname.includes('payment-sandbox-visualizer');
@@ -193,7 +275,7 @@ export default function App() {
   };
 
   // State appending functions (to mock Postgres inserts)
-  const handleAddInquiry = (newInq: Inquiry) => {
+  const handleAddInquiry = async (newInq: Inquiry) => {
     setInquiries([newInq, ...inquiries]);
     
     // Auto trigger notification alert
@@ -207,6 +289,37 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
     setNotifications([newNot, ...notifications]);
+
+    // Retrieve full listing details for contextual dispatches
+    const listing = listings.find(l => l.id === newInq.listingId);
+    if (listing) {
+      // 1. Send SMS notify to Landlord via Africa's Talking Node
+      const landlordPhone = listing.author?.phone || '+254712345678';
+      const mpesaSmsText = `Hello! You have received a premium inquiry from ${newInq.senderName} (${newInq.senderPhone}) on your property "${listing.title}". Message: "${newInq.message.substring(0, 60)}..."`;
+      
+      const { sendSMSNotification, sendEmailNotification } = await import('./utils/paymentAndNotify');
+      await sendSMSNotification(landlordPhone, mpesaSmsText);
+
+      // 2. EmailJS - Send template_new_inquiry to landlord
+      await sendEmailNotification('template_new_inquiry', {
+        to_email: listing.author?.email || 'mwangi@nestlist.luxury',
+        landlord_name: listing.author?.name || 'Property Owner',
+        tenant_name: newInq.senderName,
+        tenant_phone: newInq.senderPhone,
+        tenant_email: newInq.senderEmail,
+        listing_title: listing.title,
+        message: newInq.message
+      });
+
+      // 3. EmailJS - Send template_inquiry_sent to tenant
+      await sendEmailNotification('template_inquiry_sent', {
+        to_email: newInq.senderEmail || 'mkenya@gmail.com',
+        tenant_name: newInq.senderName,
+        listing_title: listing.title,
+        landlord_phone: landlordPhone,
+        message: newInq.message
+      });
+    }
   };
 
   const handleUpdateInquiryStatus = (id: string, replyText: string) => {
@@ -239,16 +352,29 @@ export default function App() {
     const verifiedListing: Listing = {
       ...newListing,
       status: 'pending_payment', // strict requirement
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       author: {
         ...newListing.author,
         isVerified: userProfile.isVerified
       }
-    };
+    } as any;
+
+    // Send SMS notify to landlord of creation
+    import('./utils/paymentAndNotify').then(({ sendSMSNotification, getListingFee }) => {
+      const landlordPhone = verifiedListing.author?.phone || '+254712345678';
+      const fee = getListingFee(verifiedListing.propertyType, verifiedListing.details.bedrooms);
+      const msg = `Hello! Your property listing "${verifiedListing.title}" has been successfully received on NestList. Please complete the listing fee of KSh ${fee} to publish it live for 30 days.`;
+      sendSMSNotification(landlordPhone, msg);
+    });
 
     // Save on real express full-stack server backend
+    const token = localStorage.getItem('nestlist_token');
     fetch('/api/listings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(verifiedListing)
     })
     .then(res => res.json())
@@ -397,6 +523,16 @@ export default function App() {
     setListings(updated);
   };
 
+  const handleActivateListing = (id: string) => {
+    const updated = listings.map(l => {
+      if (l.id === id) {
+        return { ...l, status: 'active' as any };
+      }
+      return l;
+    });
+    setListings(updated);
+  };
+
   const handleDeleteListing = (id: string) => {
     const updated = listings.filter(l => l.id !== id);
     setListings(updated);
@@ -507,12 +643,20 @@ export default function App() {
     setSearchBedrooms(search.filters.bedrooms);
     setFilterAmenities(search.filters.amenities);
     setFilterFurnishedOnly(search.filters.isFurnished);
-    setActiveTab('listings');
+    setActiveTab('home');
   };
 
   // FILTER LOGIC COMPILER
   const compiledListings = useMemo(() => {
     let result = [...listings];
+
+    // Exclude any pending_payment status listings unless it belongs to the active landlord/agent user
+    result = result.filter(item => {
+      if (item.status === 'active' || !item.status) return true;
+      // Keep it visible if current user is the author
+      if (item.author?.email === userProfile?.contactEmail) return true;
+      return false;
+    });
 
     // Filter location text (Matches text searches in keyword, title, neighborhood, address, or county name)
     if (searchLocation.trim()) {
@@ -549,7 +693,11 @@ export default function App() {
 
     // Filter bedrooms
     if (searchBedrooms !== 'all') {
-      result = result.filter(item => item.details.bedrooms === searchBedrooms);
+      if (searchBedrooms === '5plus') {
+        result = result.filter(item => item.details.bedrooms >= 5);
+      } else {
+        result = result.filter(item => item.details.bedrooms === searchBedrooms);
+      }
     }
 
     // Filter furnishing
@@ -586,8 +734,45 @@ export default function App() {
     return result;
   }, [listings, searchLocation, searchCounty, searchPropertyType, searchPriceRange, searchBedrooms, sortOrder, filterFurnishedOnly, filterAmenities]);
 
+  // Slice compiledListings to implement infinite visual pagination limit (Upgrade 9)
+  const paginatedListings = useMemo(() => {
+    return compiledListings.slice(0, visibleCount);
+  }, [compiledListings, visibleCount]);
+
   // Selected Listing Object ref
   const activeListingDetails = listings.find(l => l.id === selectedListingId);
+
+  const handleLogout = () => {
+    localStorage.removeItem('nestlist_token');
+    localStorage.removeItem('nestlist_user_phone');
+    setIsLoggedIn(false);
+    setCurrentRole('Tenant');
+    setSelectedListingId(null);
+    setActiveTab('home');
+  };
+
+  const handleLoginSuccess = (role: UserRole, email: string, name: string, token: string, phone: string, avatarUrl?: string) => {
+    localStorage.setItem('nestlist_token', token);
+    localStorage.setItem('nestlist_user_phone', phone);
+    setCurrentRole(role);
+    setUserProfile(prev => ({
+      ...prev,
+      fullName: name,
+      contactEmail: email,
+      contactPhone: phone || prev.contactPhone,
+      avatarUrl: avatarUrl || prev.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
+      kycStatus: role === 'Agent' || role === 'Landlord' ? 'verified' : 'pending'
+    }));
+    setIsLoggedIn(true);
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <Login 
+        onLoginSuccess={handleLoginSuccess} 
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col justify-between selection:bg-brand-blue selection:text-white">
@@ -604,10 +789,12 @@ export default function App() {
         onMarkAllRead={handleMarkNotificationsAllRead}
         onOpenAddListing={() => setAddListingOpen(true)}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => setActiveTab(tab as any)}
         onSelectPropertyId={setSelectedListingId}
         userProfile={userProfile}
         onUpdateProfile={setUserProfile}
+        isLoggedIn={isLoggedIn}
+        setIsLoggedIn={setIsLoggedIn}
       />
 
       {/* COMPONENT OUTLINE RENDER DECISIONS */}
@@ -651,7 +838,7 @@ export default function App() {
                 onToggleFavorite={handleToggleFavorite}
                 onSelectListing={(id) => {
                   setSelectedListingId(id);
-                  setActiveTab('listings');
+                  setActiveTab('home');
                 }}
                 viewingRequests={viewingRequests}
                 inquiries={inquiries}
@@ -674,435 +861,575 @@ export default function App() {
                 onTriggerSavedSearch={handleTriggerSavedSearch}
                 simulatedEmails={simulatedEmails}
                 onUpdateProfile={setUserProfile}
+                onActivateListing={handleActivateListing}
+                onLogout={handleLogout}
               />
             </motion.div>
           )
 
-          // OPTION 3: PRIMARY HOMEPAGE EXPLORE SECTION (GRID / DIRECTORY BINDER)
-          : (
+          // OPTION 3: TENANT HOME WORKSPACE AND INTERACTIVE SEARCH WORKBENCH (Adopting the NestList Browse design!)
+          : (activeTab === 'home' || activeTab === 'search') ? (
             <motion.div 
-              key="explore"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              key="browse-search"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="space-y-8"
+              className="space-y-8 max-w-6xl mx-auto px-4 mt-6 pb-20"
             >
-              {/* IMMERSIVE HEADER HERO SLIDER PARALLAX */}
-              <div className="relative overflow-hidden py-16 px-4 md:px-8 bg-brand-dark border-b border-white/5">
-                <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
-                  backgroundImage: 'radial-gradient(circle at top right, rgba(59,130,246,0.2) 0%, transparent 60%)'
-                }}></div>
+              {/* HERO SECTION */}
+              <div className="text-center py-10 md:py-16 space-y-6 relative overflow-hidden rounded-3xl">
+                {/* Floating ambient color blobs that change color per page visual theme */}
+                <div className="absolute -top-12 left-1/4 w-80 h-80 bg-violet-600/15 rounded-full blur-[120px] pointer-events-none animate-shimmer-line" />
+                <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none animate-shimmer-line" />
 
-                <div className="max-w-4xl mx-auto text-center space-y-4">
-                  <span className="inline-flex items-center gap-1.5 bg-brand-gold/10 border border-brand-gold/30 text-brand-gold font-mono font-bold text-[10px] px-3.5 py-1 rounded-full uppercase tracking-wider">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    NestList Elite Portfolio Syndicator
-                  </span>
-                  
-                  <h1 className="text-3xl md:text-5xl font-serif text-white font-black tracking-tight leading-tight">
-                    Premium Living, Synergistic Luxury.
-                  </h1>
-                  
-                  <p className="text-xs md:text-sm text-gray-400 font-sans max-w-xl mx-auto">
-                    The most definitive estate syndicate in Nairobi. Screen diplomat-vetted houses, villas, and minimalist duplexes with continuous service backups.
-                  </p>
-
-                  {/* HIGH FIDELITY INTEGRATED SEARCH ROW */}
-                  <div className="pt-4 max-w-3xl mx-auto">
-                    <div className="p-2 gap-2 bg-brand-card/90 backdrop-blur border border-white/10 rounded-2xl md:rounded-3xl shadow-xl flex flex-col md:flex-row items-center">
-                      
-                      {/* Search box */}
-                      <div className="relative w-full flex-1">
-                        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-blue w-4 h-4" />
-                        <input 
-                          type="text" 
-                          value={searchLocation}
-                          onChange={(e) => setSearchLocation(e.target.value)}
-                          placeholder="Search estates or roads (e.g. Nyali, Runda)..."
-                          className="w-full bg-transparent pl-10 pr-3 py-2 text-xs text-white outline-none placeholder-gray-500 font-medium"
-                        />
-                      </div>
-
-                      <div className="h-[1px] md:h-8 w-full md:w-[1px] bg-white/10"></div>
-
-                      {/* County select */}
-                      <div className="w-full md:w-44 text-left">
-                        <label className="text-[8px] font-mono font-black uppercase text-brand-gold tracking-[0.1em] pl-3 block mb-0.5">County</label>
-                        <select
-                          value={searchCounty}
-                          onChange={(e) => setSearchCounty(e.target.value)}
-                          className="w-full bg-transparent text-xs py-1 px-3 text-gray-200 font-bold outline-none cursor-pointer"
-                        >
-                          <option value="all" className="bg-brand-card text-white font-bold">All Kenya Counties</option>
-                          {KENYA_COUNTIES_CLEAN.map((county, idx) => (
-                            <option key={idx} value={county} className="bg-brand-card text-white font-medium">
-                              {county}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="h-[1px] md:h-8 w-full md:w-[1px] bg-white/10"></div>
-
-                      {/* Type pick */}
-                      <div className="w-full md:w-44">
-                        <select
-                          value={searchPropertyType}
-                          onChange={(e) => setSearchPropertyType(e.target.value)}
-                          className="w-full bg-transparent text-xs py-2 px-3 text-gray-200 font-semibold outline-none cursor-pointer"
-                        >
-                          <option value="all" className="bg-brand-card text-white">All Properties</option>
-                          <option value="Villa" className="bg-brand-card text-white">Luxury Villas</option>
-                          <option value="Apartment" className="bg-brand-card text-white">Duplex Apartments</option>
-                          <option value="House" className="bg-brand-card text-white font-semibold text-xs">Houses</option>
-                          <option value="Studio" className="bg-brand-card text-white font-semibold text-xs">Studios</option>
-                          <option value="Bedsitter" className="bg-brand-card text-white font-semibold text-xs">Bedsitters</option>
-                        </select>
-                      </div>
-
-                      <div className="h-[1px] md:h-8 w-full md:w-[1px] bg-white/10"></div>
-
-                      {/* Filter Slider toggle button */}
-                      <button
-                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                        className={`w-full md:w-fit px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                          showAdvancedFilters || filterAmenities.length > 0
-                            ? 'bg-brand-blue/15 text-brand-blue border border-brand-blue/30' 
-                            : 'text-gray-400 hover:text-white bg-white/5 border border-transparent'
-                        }`}
-                      >
-                        <SlidersHorizontal className="w-4 h-4" />
-                        Filters
-                      </button>
-
-                    </div>
+                <div className="space-y-5 relative z-10">
+                  {/* Live Listing Count Pill */}
+                  <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-full text-xs font-bold text-emerald-400 font-dmsans uppercase tracking-widest">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {compiledListings.length} verified properties live
                   </div>
 
-                </div>
-              </div>
-
-              {/* ADVANCED FILTER PANEL WORKBENCH AREA */}
-              <AnimatePresence>
-                {showAdvancedFilters && (
-                  <motion.div
-                    id="advanced-filters-panel"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden max-w-4xl mx-auto px-4 md:px-8"
-                  >
-                    <div className="p-6 bg-brand-card/30 border border-white/5 rounded-3xl grid grid-cols-2 md:grid-cols-4 gap-6 text-xs text-sans">
-                      
-                      {/* Price caps bounds */}
-                      <div className="space-y-2 col-span-2 md:col-span-1">
-                        <div className="flex justify-between items-center text-[10px] font-mono text-gray-400 uppercase">
-                          <span>Max Price Cap</span>
-                          <span className="text-brand-gold font-bold">KES {searchPriceRange.toLocaleString()}</span>
-                        </div>
-                        <input 
-                          type="range"
-                          min={20000}
-                          max={600000}
-                          step={10000}
-                          value={searchPriceRange}
-                          onChange={(e) => setSearchPriceRange(Number(e.target.value))}
-                          className="w-full accent-brand-blue h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[9px] font-mono text-gray-500">
-                          <span>KSh 20k</span>
-                          <span>KSh 600k</span>
-                        </div>
-                      </div>
-
-                      {/* Bedrooms specs */}
-                      <div className="space-y-2">
-                        <span className="block text-[10px] text-gray-400 font-mono uppercase">Bedrooms</span>
-                        <div className="flex gap-1">
-                          {['all', 1, 2, 3, 4, 5].map(b => (
-                            <button
-                              key={b}
-                              onClick={() => setSearchBedrooms(b as any)}
-                              className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-mono font-bold transition-all ${
-                                searchBedrooms === b 
-                                  ? 'bg-brand-blue text-white ring-1 ring-brand-blue/30' 
-                                  : 'bg-white/5 text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              {b === 'all' ? 'All' : `${b}`}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Distance index */}
-                      <div className="space-y-2 col-span-2 md:col-span-1">
-                        <div className="flex justify-between items-center text-[10px] font-mono text-gray-400 uppercase">
-                          <span>Radius center</span>
-                          <span className="text-brand-blue font-bold">{filterDistanceFromCenter} KM radius</span>
-                        </div>
-                        <input 
-                          type="range"
-                          min={2}
-                          max={50}
-                          step={1}
-                          value={filterDistanceFromCenter}
-                          onChange={(e) => setFilterDistanceFromCenter(Number(e.target.value))}
-                          className="w-full accent-brand-blue h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Quick Toggles */}
-                      <div className="space-y-3 pt-5">
-                        <label className="flex items-center gap-2 cursor-pointer text-gray-300">
-                          <input 
-                            type="checkbox" 
-                            checked={filterFurnishedOnly}
-                            onChange={(e) => setFilterFurnishedOnly(e.target.checked)}
-                            className="rounded border-white/10 text-brand-blue focus:ring-brand-blue bg-transparent"
-                          />
-                          <span>Furnished Only</span>
-                        </label>
-                      </div>
-
-                      {/* Amenities checklist selectors inline */}
-                      <div className="col-span-2 md:col-span-4 border-t border-white/5 pt-4 space-y-2">
-                        <span className="block text-[10px] text-gray-400 uppercase font-mono">Screen for service inclusions</span>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            { id: 'wifi', name: '📶 WiFi' },
-                            { id: 'parking', name: '🚗 Parking' },
-                            { id: 'gym', name: '🏋️ Gym' },
-                            { id: 'pool', name: '🏊 Pool' },
-                            { id: 'security', name: '🛡️ Guards' },
-                            { id: 'water', name: '🚰 Borehole' },
-                            { id: 'electricity_backup', name: '⚡ Generator' }
-                          ].map(am => (
-                            <button
-                              key={am.id}
-                              onClick={() => handleToggleFilterAmenity(am.id)}
-                              className={`px-3 py-1.5 rounded-full text-[10px] font-semibold border ${
-                                filterAmenities.includes(am.id)
-                                  ? 'bg-brand-blue/10 border-brand-blue/30 text-brand-blue'
-                                  : 'bg-white/5 border-transparent text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              {am.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Save Search preference and Reset utilities */}
-                      <div className="col-span-2 md:col-span-4 border-t border-white/5 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                          <input 
-                            type="text" 
-                            value={newSavedSearchName}
-                            onChange={(e) => setNewSavedSearchName(e.target.value)}
-                            placeholder="Name search (e.g. Kilimani 3BR)"
-                            className="bg-brand-dark/50 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] text-white outline-none focus:border-brand-blue min-w-[200px]"
-                          />
-                          <button 
-                            onClick={handleSaveCurrentFilters}
-                            className="bg-brand-blue hover:bg-blue-600 text-white font-sans font-bold text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl transition-all pointer-events-auto cursor-pointer"
-                          >
-                            💾 Save Search Params
-                          </button>
-                        </div>
-                        <button 
-                          onClick={handleResetFilters}
-                          className="text-[10px] font-bold text-gray-400 hover:text-white uppercase font-mono tracking-wider pointer-events-auto cursor-pointer"
-                        >
-                          Clear Premium parameters
-                        </button>
-                      </div>
-
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* LISTINGS DIRECTORY RENDER ZONE (DYNAMIC SPLIT GRID) */}
-              <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
-                
-                {/* Result count, layout formats toggles, and sorting selection */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-brand-dark/50 border-b border-white/5 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400 font-mono">
-                      FOUND: <span className="text-white font-bold">{compiledListings.length}</span> luxury listings matching parameters
+                  {/* Large Heading with subtle animated background gradient glow */}
+                  <h1 className="text-[36px] md:text-[52px] font-extrabold font-syne tracking-tight text-white max-w-4xl mx-auto leading-tight transition-all">
+                    Find Your Dream Home <br className="hidden sm:inline" />
+                    <span className="relative inline-block bg-gradient-to-r from-[#7C6FF7] via-[#C084FC] via-[#34D399] via-[#60A5FA] to-[#FB923C] bg-clip-text text-transparent bg-[length:200%_auto] animate-shimmer-line py-1">
+                      Across Kenya
                     </span>
+                  </h1>
 
-                    {/* Split Map mode toggle option */}
-                    <button
-                      onClick={() => setSplitMapMode(!splitMapMode)}
-                      className={`text-[10px] font-bold font-mono px-2.5 py-1 rounded-lg border  transition-colors ${
-                        splitMapMode 
-                          ? 'bg-brand-gold/15 text-brand-gold border-brand-gold/30' 
-                          : 'bg-white/5 text-gray-400 border-white/5 hover:text-white'
-                      }`}
+                  {/* Subtitle */}
+                  <p className="text-slate-400 font-dmsans max-w-xl mx-auto text-sm md:text-base font-semibold">
+                    Browse verified properties from trusted landlords
+                  </p>
+
+                  {/* 3 Trust Stats */}
+                  <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 pt-2 text-xs md:text-sm font-semibold text-slate-300 font-dmsans">
+                    <span className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-full">🏠 1,200+ Listings</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-full">✅ Verified Landlords</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-full">⚡ Instant Contact</span>
+                  </div>
+                </div>
+
+                {/* Full-width Search Bar height 56px (h-14) (Upgrade 2, 10 & 12) */}
+                <div id="hero-search-wrapper" className="pt-6 relative max-w-3xl mx-auto z-30">
+                  {/* Clicking backdrop closes the suggestion popup */}
+                  {showSearchSuggestions && (
+                    <div 
+                      className="fixed inset-0 z-20 cursor-default" 
+                      onClick={() => setShowSearchSuggestions(false)} 
+                    />
+                  )}
+
+                  <div className="relative z-30 bg-[#0E0F1C]/90 backdrop-blur-xl border border-white/10 p-2 rounded-2xl flex flex-col md:flex-row items-center gap-2 w-full shadow-2xl shadow-purple-950/20 glow-purple-focus h-auto md:h-14">
+                    <div className="flex items-center gap-2 px-3.5 flex-1 w-full border-b md:border-b-0 md:border-r border-white/5 pb-2.5 md:pb-0 h-full">
+                      <MapPin className="w-5 h-5 text-indigo-400 shrink-0 animate-bounce" />
+                      <input 
+                        type="text" 
+                        value={searchLocation}
+                        onChange={(e) => {
+                          setSearchLocation(e.target.value);
+                          setShowSearchSuggestions(true);
+                        }}
+                        onFocus={() => setShowSearchSuggestions(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSearchSubmit(searchLocation);
+                          }
+                        }}
+                        placeholder="Where would you like to live? (e.g. Kilimani, Westlands, Nyali...)"
+                        className="w-full bg-transparent border-none outline-none font-dmsans font-semibold text-white placeholder:text-slate-500 text-sm py-1.5 focus:ring-0 focus:outline-none"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => handleSearchSubmit(searchLocation)}
+                      className="w-full md:w-auto h-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white text-xs font-syne font-black px-8 rounded-xl tracking-wider transition-all cursor-pointer select-none py-3.5"
                     >
-                      🗺️ Map split view {splitMapMode ? 'ON' : 'OFF'}
+                      SEARCH HOME
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-3 font-mono text-[11px] text-gray-400">
-                    <span className="hidden sm:inline">SORT BY:</span>
-                    <select
-                      value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value as any)}
-                      className="bg-brand-card/60 p-1 px-2 border border-white/5 rounded-lg text-white"
-                    >
-                      <option value="newest">Featured Newest</option>
-                      <option value="price-low">Price Low to High</option>
-                      <option value="price-high">Price High to Low</option>
-                      <option value="popular">Most Popular views</option>
-                    </select>
-
-                    {/* Layout format toggles */}
-                    <div className="flex bg-white/5 p-0.5 rounded-lg border border-white/5">
-                      <button
-                        onClick={() => setViewFormat('grid')}
-                        className={`p-1.5 rounded-md ${viewFormat === 'grid' ? 'bg-brand-blue text-white' : 'hover:text-white'}`}
-                      >
-                        <Grid className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewFormat('list')}
-                        className={`p-1.5 rounded-md ${viewFormat === 'list' ? 'bg-brand-blue text-white' : 'hover:text-white'}`}
-                      >
-                        <List className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Grid vs Split flow alignment */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  
-                  {/* Left Column Feed (Grid / list format items) */}
-                  <div className={`space-y-6 ${splitMapMode ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
-                    {compiledListings.length === 0 ? (
-                      <div className="text-center py-24 glass-premium rounded-3xl border border-white/5">
-                        <AlertCircle className="w-10 h-10 text-brand-gold mx-auto mb-3" />
-                        <h4 className="text-base font-serif font-bold text-white">No properties matching parameters</h4>
-                        <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-                          Try expanding your search cap, toggling un-furnished items, or resetting the active amenities criteria.
-                        </p>
-                        <button 
-                          onClick={handleResetFilters}
-                          className="bg-brand-blue/10 text-brand-blue border border-brand-blue/20 hover:bg-brand-blue/20 px-4 py-2 rounded-xl text-xs font-semibold mt-4"
-                        >
-                          Reset Filters
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={`grid gap-6 ${
-                        viewFormat === 'list' 
-                          ? 'grid-cols-1' 
-                          : splitMapMode 
-                          ? 'grid-cols-1 md:grid-cols-2' 
-                          : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                      }`}>
-                        {compiledListings.map(item => (
-                          <div 
-                            key={item.id}
-                            onMouseEnter={() => setHoveredListingId(item.id)}
-                            onMouseLeave={() => setHoveredListingId(null)}
-                            className={`${item.id === hoveredListingId ? 'scale-101 ring-2 ring-brand-blue/10 rounded-2xl transition-all duration-300' : 'transition-transform duration-300'}`}
-                          >
-                            <ListingCard 
-                              listing={item}
-                              isFavorite={favorites.includes(item.id)}
-                              onToggleFavorite={handleToggleFavorite}
-                              onSelect={setSelectedListingId}
-                              viewFormat={viewFormat}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right Column (MAP PANEL SPLIT MODE) */}
-                  {splitMapMode && (
-                    <div className="lg:col-span-4 h-[75vh] sticky top-28 rounded-3xl border border-white/15 overflow-hidden shadow-2xl bg-brand-dark/80 relative flex flex-col justify-between p-4">
+                  {/* DROP-DOWN SEARCH SUGGESTIONS INTERACTIVE POPUP (Upgrade 12) */}
+                  {showSearchSuggestions && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#0C0D17]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-5 shadow-2xl z-40 text-left space-y-4 max-h-[350px] overflow-y-auto scrollbar-none">
                       
-                      {/* Grid overlay mapping */}
-                      <div className="absolute inset-0 opacity-15 pointer-events-none" style={{
-                        backgroundImage: 'radial-gradient(ellipse at center, rgba(59,130,246,0.3) 0%, transparent 70%), linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-                        backgroundSize: '100%, 20px 20px, 20px 20px'
-                      }}></div>
+                      {/* Live queries list if keyword populated */}
+                      {searchLocation.trim() && (
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] uppercase font-mono font-black text-violet-400 tracking-wider">Matching Areas:</span>
+                          <div className="grid grid-cols-1 gap-1">
+                            {["Kilimani", "Westlands", "Karen", "Lavington", "Kileleshwa", "Kasarani", "Ruaka", "Ngong Road", "South B", "South C", "Eastleigh", "Mombasa CBD", "Nyali", "Nakuru", "Eldoret", "Kisumu"]
+                              .filter(loc => loc.toLowerCase().includes(searchLocation.toLowerCase()))
+                              .slice(0, 5)
+                              .map(matchingLoc => (
+                                <button
+                                  key={matchingLoc}
+                                  onClick={() => handleSearchSubmit(matchingLoc)}
+                                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/5 text-slate-200 text-xs font-bold font-dmsans transition-all flex items-center gap-2 cursor-pointer"
+                                >
+                                  <MapPin className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                                  <span>{matchingLoc}</span>
+                                </button>
+                              ))
+                            }
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="z-10 bg-brand-dark/85 backdrop-blur-md p-3.5 rounded-2xl border border-white/5 space-y-1">
-                        <span className="text-[10px] text-brand-gold font-mono uppercase block font-bold leading-none">Map Split Synced Ledger</span>
-                        <span className="text-[10px] text-gray-400 block font-mono">Nairobi High-Security Perimeter Zone</span>
-                      </div>
-
-                      {/* Interactive dot markers based on filtered list coordinates */}
-                      <div className="flex-1 relative flex items-center justify-center">
-                        {compiledListings.map(lst => {
-                          const latY = lst.location.coordinates.lat;
-                          const lngX = lst.location.coordinates.lng;
-
-                          // Approximate mapper into pixel grid percent ( Nairobi coordinates approx focus)
-                          const targetXPercent = ((lngX - 36.65) / 0.25) * 100;
-                          const targetYPercent = ((Math.abs(latY) - 1.2) / 0.15) * 100;
-
-                          return (
-                            <button
-                              key={lst.id}
-                              onClick={() => setSelectedListingId(lst.id)}
-                              onMouseEnter={() => setHoveredListingId(lst.id)}
-                              onMouseLeave={() => setHoveredListingId(null)}
-                              className="absolute w-8 h-8 flex items-center justify-center group pointer-events-auto transition-transform active:scale-95"
-                              style={{
-                                left: `${targetXPercent}%`,
-                                top: `${targetYPercent}%`
+                      {/* Recent queries */}
+                      {recentSearches.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] uppercase font-mono font-black text-slate-500 tracking-wider">Recent Searches</span>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRecentSearches([]);
+                                localStorage.removeItem('nestlist_recent_searches');
                               }}
+                              className="text-[9px] font-bold text-rose-400 hover:underline uppercase font-mono transition-colors cursor-pointer"
                             >
-                              <div className="relative">
-                                {/* Pin visual nodes */}
-                                <div className={`absolute -inset-1 rounded-full transition-all duration-300 ${
-                                  lst.id === hoveredListingId ? 'bg-brand-gold/30 animate-ping' : 'bg-brand-blue/20'
-                                }`}></div>
-                                
-                                <div className={`w-3.5 h-3.5 rounded-full border border-white shadow-lg flex items-center justify-center transition-all ${
-                                  lst.id === hoveredListingId ? 'bg-brand-gold text-brand-dark scale-115' : 'bg-brand-blue text-white'
-                                }`}>
-                                  <span className="text-[8px] font-sans font-black">
-                                    {lst.pricing.currency === 'USD' ? '$' : 'K'}
-                                  </span>
-                                </div>
-
-                                {/* Floating card tooltips on pin hover */}
-                                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-brand-dark border border-white/15 p-2 rounded shadow-2xl z-40 max-w-[120px] pointer-events-none text-left">
-                                  <span className="text-[9px] font-sans font-bold text-white block truncate">{lst.title}</span>
-                                  <span className="text-[8px] text-brand-gold block mt-0.5 leading-none font-mono">
-                                    {lst.pricing.currency === 'USD' ? '$' : 'K'}{lst.pricing.rent.toLocaleString()}
-                                  </span>
-                                </div>
-
-                              </div>
+                              Clear All
                             </button>
-                          );
-                        })}
-                      </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {recentSearches.map(term => (
+                              <button
+                                key={term}
+                                onClick={() => handleSearchSubmit(term)}
+                                className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-violet-600/20 border border-white/5 text-[11px] font-bold text-slate-300 transition-all font-dmsans cursor-pointer"
+                              >
+                                ↺ {term}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                      <div className="z-10 bg-brand-dark/95 p-3 rounded-2xl border border-white/5">
-                        <p className="text-[10px] text-center text-gray-500 font-mono leading-relaxed">
-                          Hover mapping pins to inspect financial attributes. Click on pins opens property deep sheet.
-                        </p>
+                      {/* Popular Estates Grid list */}
+                      <div className="space-y-2 pt-1 border-t border-white/5">
+                        <span className="text-[10px] uppercase font-mono font-black text-slate-500 tracking-wider">Popular Kenya Estates</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {["Kilimani", "Westlands", "Karen", "Lavington", "Kileleshwa", "Kasarani", "Ruaka", "Ngong Road", "South B", "South C", "Eastleigh", "Mombasa CBD", "Nyali", "Nakuru", "Eldoret", "Kisumu"].map(est => (
+                            <button
+                              key={est}
+                              onClick={() => handleSearchSubmit(est)}
+                              className="text-left px-2.5 py-2 rounded-xl hover:bg-white/5 text-slate-300 text-[11px] font-bold transition-all truncate hover:text-white cursor-pointer"
+                            >
+                              🗺️ {est}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-
                     </div>
                   )}
 
+                  {/* Popular search chips */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs font-semibold text-slate-400 relative z-10">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Popular:</span>
+                    {["Kilimani", "Westlands", "Karen", "Kasarani", "Mombasa"].map(chip => (
+                      <button
+                        key={chip}
+                        onClick={() => handleSearchSubmit(chip)}
+                        className="px-3 py-1 bg-[#121324] hover:bg-violet-600/20 border border-white/5 text-slate-300 rounded-full transition-all text-[11px] active:scale-95 cursor-pointer"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* FILTER ROW */}
+              <div className="bg-[#0E0F1C]/85 backdrop-blur-md border border-white/10 rounded-3xl p-5 space-y-4 font-dmsans">
+                
+                {/* Scrollable Row for Unified Property and bedroom pills */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                  <div className="space-y-1">
+                    <span className="block text-[10px] text-slate-500 font-bold uppercase font-mono tracking-widest">Filter by category or size:</span>
+                    <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-2 md:pb-0 scrollbar-none max-w-full">
+                      {[
+                        { label: 'All', type: 'all', beds: 'all' },
+                        { label: 'Single Room', type: 'Single Room', beds: 'all' },
+                        { label: 'Bedsitter', type: 'Bedsitter', beds: 'all' },
+                        { label: 'Studio', type: 'Studio', beds: 'all' },
+                        { label: '1BR', type: 'all', beds: 1 },
+                        { label: '2BR', type: 'all', beds: 2 },
+                        { label: '3BR', type: 'all', beds: 3 },
+                        { label: '4BR', type: 'all', beds: 4 },
+                        { label: '5BR+', type: 'all', beds: '5plus' }
+                      ].map(pill => {
+                        const isPillActive = (pill.type === 'all' && pill.beds === 'all') 
+                          ? (searchPropertyType === 'all' && searchBedrooms === 'all')
+                          : (pill.type !== 'all' ? searchPropertyType === pill.type : searchBedrooms === pill.beds);
+
+                        return (
+                          <motion.button
+                            key={pill.label}
+                            whileTap={{ scale: 0.90 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                            onClick={() => {
+                              if (pill.type === 'all' && pill.beds === 'all') {
+                                setSearchPropertyType('all');
+                                setSearchBedrooms('all');
+                              } else if (pill.type !== 'all') {
+                                setSearchPropertyType(pill.type);
+                                setSearchBedrooms('all');
+                              } else {
+                                setSearchPropertyType('all');
+                                setSearchBedrooms(pill.beds as any);
+                              }
+                            }}
+                            className={`px-4.5 py-2.5 rounded-xl text-xs font-syne font-extrabold transition-all duration-300 border cursor-pointer select-none relative ${
+                              isPillActive
+                                ? 'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 text-white border-transparent shadow-[0_0_20px_rgba(139,92,246,0.35)] font-black'
+                                : 'bg-[#121324] text-slate-400 border-white/5 hover:border-white/15'
+                            }`}
+                          >
+                            {pill.label}
+                            {isPillActive && (
+                              <motion.span 
+                                layoutId="activeFilterPillDot"
+                                className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#08080F]"
+                              />
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Clear all filters trigger */}
+                  {(() => {
+                    const isAnyFilterActive = searchLocation !== '' || searchPropertyType !== 'all' || searchBedrooms !== 'all' || searchCounty !== 'all' || searchPriceRange !== 500000 || filterFurnishedOnly || filterAmenities.length > 0;
+                    if (!isAnyFilterActive) return null;
+                    return (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={handleResetFilters}
+                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 border border-rose-500/20 text-xs font-syne font-black rounded-full transition-all cursor-pointer select-none shrink-0"
+                      >
+                        ✕ Clear All Filters
+                      </motion.button>
+                    );
+                  })()}
                 </div>
 
+                {/* Sub row with slider and selectors */}
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-5">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
+                    
+                    {/* Price Slider integrated directly instead of dropdown */}
+                    <div className="bg-[#121324] border border-white/5 rounded-2xl p-3.5 flex-1 min-w-[240px] space-y-1.5 text-left">
+                      <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-405 font-mono">
+                        <span>Max Rent Budget Slider:</span>
+                        <span className="text-violet-400 font-extrabold text-[11px]">KES {searchPriceRange.toLocaleString()}</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min={15000}
+                        max={600000}
+                        step={5000}
+                        value={searchPriceRange}
+                        onChange={(e) => setSearchPriceRange(Number(e.target.value))}
+                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                      />
+                    </div>
+
+                    {/* County / City filter */}
+                    <div className="bg-[#121324] border border-white/5 rounded-2xl p-3.5 flex flex-col justify-center text-left">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase font-mono tracking-wider mb-1 block">Metropolitan Area:</span>
+                      <select
+                        value={searchCounty}
+                        onChange={(e) => setSearchCounty(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-white cursor-pointer outline-none min-w-[140px] py-1"
+                      >
+                        <option value="all">Everywhere in Kenya</option>
+                        {KENYA_COUNTIES_CLEAN.map((county, idx) => (
+                          <option key={idx} value={county}>{county}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sorting dropdown */}
+                    <div className="bg-[#121324] border border-white/5 rounded-2xl p-3.5 flex flex-col justify-center text-left">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase font-mono tracking-wider mb-1 block">Sorted Sequence:</span>
+                      <select
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as any)}
+                        className="bg-transparent border-none text-xs font-bold text-white cursor-pointer outline-none min-w-[150px] py-1"
+                      >
+                        <option value="newest">Newest Houses</option>
+                        <option value="price-low">Price: Low to High</option>
+                        <option value="price-high">Price: High to Low</option>
+                        <option value="popular">Most Viewed / Hot</option>
+                      </select>
+                    </div>
+
+                  </div>
+
+                  <div className="flex items-center justify-between lg:justify-end gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5">
+                    {/* Matching text info indicator */}
+                    <span className="text-xs text-slate-400 font-bold font-mono">
+                      {compiledListings.length} {compiledListings.length === 1 ? 'property' : 'properties'} found
+                    </span>
+
+                    {/* Grid/List view toggle buttons */}
+                    <div className="flex items-center bg-[#121324] border border-white/5 rounded-xl p-1 shrink-0">
+                      <button
+                        onClick={() => setViewFormat('grid')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          viewFormat === 'grid' 
+                            ? 'bg-gradient-to-r from-violet-500 to-indigo-505 text-white font-extrabold shadow-md' 
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="Grid style"
+                      >
+                        Grid
+                      </button>
+                      <button
+                        onClick={() => setViewFormat('list')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          viewFormat === 'list' 
+                            ? 'bg-gradient-to-r from-violet-500 to-indigo-550 text-white font-extrabold shadow-md' 
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                        title="List style"
+                      >
+                        List
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ADVANCED CRITERIA DRAWER */}
+              <div className="text-left bg-[#0E0F1C]/45 backdrop-blur-md border border-white/5 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 font-dmsans">
+                <div className="flex flex-wrap items-center gap-6">
+                  {/* Slider cap */}
+                  <div className="space-y-1.5 min-w-[200px]">
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-400 font-mono">
+                      <span>Maximum rent budget:</span>
+                      <span className="text-violet-400 font-extrabold">KSh {searchPriceRange.toLocaleString()}</span>
+                    </div>
+                    <input 
+                      type="range"
+                      min={20000}
+                      max={600000}
+                      step={10000}
+                      value={searchPriceRange}
+                      onChange={(e) => setSearchPriceRange(Number(e.target.value))}
+                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                  </div>
+
+                  {/* Furnished Status Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300 font-bold">
+                    <input 
+                      type="checkbox" 
+                      checked={filterFurnishedOnly}
+                      onChange={(e) => setFilterFurnishedOnly(e.target.checked)}
+                      className="rounded border-white/10 text-violet-500 bg-white/5 focus:ring-violet-500"
+                    />
+                    <span>Furnished Only</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-500 text-xs font-mono font-medium">{compiledListings.length} matching spaces found</span>
+                  <button 
+                    onClick={handleResetFilters}
+                    className="text-[10px] font-syne font-extrabold text-indigo-405 hover:underline uppercase tracking-wider cursor-pointer"
+                  >
+                    Reset Keys
+                  </button>
+                </div>
+              </div>
+
+              {/* FEATURED Properties section */}
+              {compiledListings.some(l => l.isFeatured) && (
+                <div className="space-y-4 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="bg-gradient-to-r from-amber-250 via-amber-400 to-yellow-500 bg-clip-text text-transparent font-syne font-extrabold text-sm uppercase tracking-wider flex items-center gap-1">
+                      ★ Featured Properties
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono font-bold uppercase">VERIFIED PREMIUM SELECTIONS</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {compiledListings.filter(l => l.isFeatured).slice(0, 3).map(item => (
+                      <div key={item.id} className="transition-all duration-300 hover:scale-[1.03] scale-[1.02] origin-center z-10">
+                        <ListingCard 
+                          listing={item}
+                          isFavorite={favorites.includes(item.id)}
+                          onToggleFavorite={handleToggleFavorite}
+                          onSelect={setSelectedListingId}
+                          viewFormat={viewFormat}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* REGULAR PROPERTIES TITLE */}
+              <div className="text-left border-b border-white/5 pb-2 flex justify-between items-center font-syne">
+                <span className="text-xs font-extrabold text-indigo-400 uppercase tracking-widest font-mono">
+                  All Kenya Listings
+                </span>
+                <span className="text-xs text-slate-500 font-bold font-dmsans">
+                  {compiledListings.length} Available Properties
+                </span>
+              </div>
+
+              {/* LISTINGS Grid FEED */}
+              {isListingsLoading ? (
+                /* Skeleton loader (Upgrade 9) */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="bg-[#0E0F1C]/75 border border-white/5 rounded-[24px] p-4 space-y-4 animate-pulse">
+                      <div className="w-full h-[180px] bg-slate-800/35 rounded-2xl animate-skeleton" />
+                      <div className="h-4.5 bg-slate-800/35 rounded w-3/4 animate-skeleton" />
+                      <div className="h-3 bg-slate-800/35 rounded w-1/2 animate-skeleton" />
+                      <div className="flex gap-2 pt-1 border-t border-white/5 pt-3">
+                        <div className="h-3 bg-slate-800/35 rounded w-10 animate-skeleton" />
+                        <div className="h-3 bg-slate-800/35 rounded w-10 animate-skeleton" />
+                        <div className="h-3 bg-slate-800/35 rounded w-10 animate-skeleton" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : compiledListings.length === 0 ? (
+                /* Empty state format (Upgrade 8) */
+                <div className="text-center py-20 bg-[#0E0F1C]/65 border border-white/10 rounded-[32px] p-8 space-y-5 max-w-lg mx-auto backdrop-blur-md shadow-2xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-violet-600/5 to-fuchsia-600/5 pointer-events-none" />
+                  
+                  <motion.div 
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                    className="text-7xl block select-none filter drop-shadow-[0_8px_16px_rgba(139,92,246,0.3)]"
+                  >
+                    🏠
+                  </motion.div>
+                  
+                  <div className="space-y-1.5">
+                    <h4 className="font-syne font-black text-lg text-white leading-tight">
+                      No properties found in {searchLocation || 'this region'}
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto font-dmsans font-semibold">
+                      Be the first partner to syndi-list your premium property here and capture verified organic leads!
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                    <button
+                      onClick={() => setAddListingOpen(true)}
+                      className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 text-white text-xs font-syne font-black rounded-xl uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-lg shadow-violet-600/20"
+                    >
+                      Post a Listing
+                    </button>
+                    <button
+                      onClick={handleResetFilters}
+                      className="w-full sm:w-auto px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-350 text-xs font-syne font-black rounded-xl uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-8 text-left">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {paginatedListings.map(item => (
+                        <div key={item.id} className="transition-all duration-300 hover:scale-[1.015]">
+                          <ListingCard 
+                            listing={item}
+                            isFavorite={favorites.includes(item.id)}
+                            onToggleFavorite={handleToggleFavorite}
+                            onSelect={setSelectedListingId}
+                            viewFormat={viewFormat}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Load More Pagination Trigger (Upgrade 9) */}
+                  {visibleCount < compiledListings.length && (
+                    <div className="pt-4 pb-6 flex justify-center w-full">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setVisibleCount(prev => prev + 12)}
+                        className="px-8 py-3.5 bg-[#121324] hover:bg-violet-600/10 border border-white/5 hover:border-violet-500/30 text-slate-300 hover:text-white text-xs font-syne font-black rounded-2xl tracking-[2px] transition-all duration-350 select-none uppercase shadow-md shadow-black/80"
+                      >
+                        Load More Listings
+                      </motion.button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </motion.div>
+          )
+
+          // OPTION 5: PROFILE WRAPPER OR IN-DRAWER CONFIGS FALLBACK
+          : (
+            <motion.div 
+              key="profile"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6 max-w-sm mx-auto px-4 py-12 text-center"
+            >
+              <div className="bg-white p-6 rounded-3xl border border-slate-205 shadow-sm space-y-4 text-left">
+                <div className="flex items-center gap-3">
+                  <img 
+                    src={userProfile.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} 
+                    className="w-14 h-14 rounded-full border border-slate-200 object-cover" 
+                    alt="Authorized Account"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <h3 className="font-bold text-slate-800">{userProfile.fullName || 'Registered Guest'}</h3>
+                    <p className="text-xs text-slate-500 font-mono font-bold uppercase">{currentRole} • Tenant Account</p>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-150 pt-3 space-y-2">
+                  <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Trust verification status</span>
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-[#4CAF50] shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 leading-tight">Identity verified successfully</p>
+                      <p className="text-[10px] text-slate-500 font-medium">Synced with Safaricom KYC Daraja Ledger API.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick actions inside settings */}
+                <div className="space-y-1.5 pt-2">
+                  <button 
+                    onClick={() => setAddListingOpen(true)}
+                    className="w-full text-center py-2.5 bg-[#1B3A6B] hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Post property listing classified
+                  </button>
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 font-bold rounded-xl text-xs cursor-pointer active:scale-98"
+                  >
+                    Logout active session
+                  </button>
+                </div>
               </div>
             </motion.div>
-          )}
-
+          )
+        }
         </AnimatePresence>
       </main>
 

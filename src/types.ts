@@ -28,7 +28,7 @@ export interface User {
   createdAt: string;
 }
 
-export type PropertyType = 'House' | 'Apartment' | 'Studio' | 'Bedsitter' | 'Villa' | 'Commercial';
+export type PropertyType = 'House' | 'Apartment' | 'Studio' | 'Bedsitter' | 'Villa' | 'Commercial' | 'Single Room';
 
 export interface ListingImage {
   id: string;
@@ -151,7 +151,7 @@ export interface SavedSearch {
     location: string;
     propertyType: string;
     maxPrice: number;
-    bedrooms: number | 'all';
+    bedrooms: number | 'all' | '5plus';
     amenities: string[];
     isFurnished: boolean;
   };

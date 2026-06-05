@@ -1,24 +1,22 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   Heart, 
   MapPin, 
   BedDouble, 
   Bath, 
   Maximize2, 
-  Star, 
   Share2, 
-  ExternalLink, 
   ChevronLeft, 
   ChevronRight,
   Send,
   Link2,
-  Check
+  Check,
+  ShieldCheck,
+  Eye,
+  Flame,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { Listing } from '../types';
 
@@ -37,34 +35,39 @@ export default function ListingCard({
   onSelect,
   viewFormat
 }: ListingCardProps) {
-  const { id, title, propertyType, location, details, pricing, media, author, isFeatured, createdAt } = listing;
+  const { id, title, propertyType, location, details, pricing, media, author, isFeatured, createdAt, views } = listing;
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  
+  // Custom states for rich micro-interactions (Upgrade 4)
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [pulseHeart, setPulseHeart] = useState(false);
 
-  // Check if listed within 7 days
-  const isNew = () => {
-    const createdDate = new Date(createdAt);
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    return createdDate >= sevenDaysAgo;
-  };
+  // Compute stats badges
+  const daysAgo = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);
+  const isNew = daysAgo <= 7;
+  const isHot = views >= 50;
+  const isExpiring = daysAgo > 25 && daysAgo <= 30; // simulated expiring logic
 
   const formattedPrice = () => {
-    const symbol = pricing.currency === 'USD' ? '$' : 'KES ';
+    let symbol = pricing.currency === 'USD' ? 'USD ' : 'KES ';
+    if (pricing.currency === 'KES') {
+      return `KES ${pricing.rent.toLocaleString()}`;
+    }
     return `${symbol}${pricing.rent.toLocaleString()}`;
   };
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (media.images.length > 0) {
+    if (media.images && media.images.length > 0) {
       setCurrentImageIdx((currentImageIdx + 1) % media.images.length);
     }
   };
 
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (media.images.length > 0) {
+    if (media.images && media.images.length > 0) {
       setCurrentImageIdx((currentImageIdx - 1 + media.images.length) % media.images.length);
     }
   };
@@ -72,242 +75,445 @@ export default function ListingCard({
   const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCopiedLink(true);
-    navigator.clipboard.writeText(`https://nestlist.luxury/listings/${id}`);
+    navigator.clipboard.writeText(`https://nestlist.ke/listings/${id}`);
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleShareSocial = (e: React.MouseEvent, type: 'whatsapp' | 'twitter') => {
     e.stopPropagation();
-    const text = encodeURIComponent(`Take a look at this stunning luxury real estate finding: "${title}" - ${formattedPrice()} on NestList!`);
-    const url = `https://nestlist.luxury/listings/${id}`;
-    let shareUrl = '';
-    if (type === 'whatsapp') {
-      shareUrl = `https://api.whatsapp.com/send?text=${text}%20${url}`;
-    } else {
-      shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
-    }
-    // We cannot open blank windows in our restricted sandboxed iframe environment, 
-    // so we show a beautiful temporary toast-like confirmation in the tooltip
+    const text = encodeURIComponent(`Rent this home in Kenya: "${title}" - ${formattedPrice()} on NestList!`);
+    const url = `https://nestlist.ke/listings/${id}`;
+    
     setShowShareTooltip(false);
-    alert(`Mock sharing to ${type === 'whatsapp' ? 'WhatsApp' : 'Twitter'}:\n"${title}"`);
+    
+    const shareUrl = type === 'whatsapp' 
+      ? `https://api.whatsapp.com/send?text=${text}%20${url}`
+      : `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+      
+    navigator.clipboard.writeText(`${text} ${url}`);
+    alert(`Copied Link for WhatsApp sharing:\n"${title}" (${formattedPrice()})`);
   };
 
+  const triggerFavoriteWithPulse = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPulseHeart(true);
+    onToggleFavorite(id, e);
+    setTimeout(() => setPulseHeart(false), 600);
+  };
+
+  const cardAmenities = details.amenities || [];
+  const visibleAmenities = cardAmenities.slice(0, 3);
+  const remainingCount = cardAmenities.length - 3;
+
+  // Render Listing view format: LIST
+  if (viewFormat === 'list') {
+    return (
+      <motion.div
+        id={`listing-card-${id}`}
+        layout
+        whileHover={{ y: -6, scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        onClick={() => onSelect(id)}
+        className={`group bg-[#0E0F1C]/85 backdrop-blur-lg rounded-3xl relative flex flex-col md:flex-row gap-5 p-4 transition-all duration-300 border cursor-pointer hover:shadow-2xl hover:shadow-violet-950/40 ${
+          isFeatured 
+            ? 'border-amber-400/30 shadow-[0_0_20px_rgba(245,200,66,0.12)] bg-[#141528]/95 glow-gold-premium' 
+            : 'border-white/5 hover:border-white/10'
+        }`}
+      >
+        {/* Photo on left - 180px wide with skeleton loaders */}
+        <div className="relative w-full md:w-[220px] h-[160px] rounded-2xl overflow-hidden shrink-0">
+          {!imageLoaded && (
+            <div className="absolute inset-0 animate-skeleton z-10" />
+          )}
+          {media.images && media.images.length > 0 ? (
+            <img
+              src={media.images[currentImageIdx]?.url}
+              alt={title}
+              onLoad={() => setImageLoaded(true)}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-full h-full bg-[#121324] flex items-center justify-center text-slate-500 text-xs font-mono">
+              No image
+            </div>
+          )}
+
+          {/* Gradient Overlay on Photo */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#08080F] via-transparent to-black/35"></div>
+
+          {/* Badges on top-left of image (dynamic counts + labels Upgrade 4) */}
+          <div className="absolute top-2.5 left-2.5 z-10 flex flex-wrap gap-1">
+            {isFeatured && (
+              <span className="flex items-center gap-1 bg-[#F5C842] text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md font-dmsans animate-gold-shimmer">
+                ★ PREMIUM
+              </span>
+            )}
+            {isNew && (
+              <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5" /> NEW
+              </span>
+            )}
+            {isHot && (
+              <span className="bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
+                <Flame className="w-2.5 h-2.5" /> HOT
+              </span>
+            )}
+            {isExpiring && (
+              <span className="bg-amber-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" /> EXPIRING
+              </span>
+            )}
+          </div>
+
+          {/* Price overlay */}
+          <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between">
+            <span className="text-sm font-black text-white text-shadow-subtle font-syne">
+              {formattedPrice()}
+            </span>
+          </div>
+
+          {/* Detail sliding highlight */}
+          <div className="absolute inset-0 bg-[#0E0F1C]/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300 pointer-events-none">
+            <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[10px] font-syne font-black px-3.5 py-2 rounded-xl shadow-lg">
+              VIEW DETAILS
+            </span>
+          </div>
+        </div>
+
+        {/* Content detail right */}
+        <div className="flex-grow flex flex-col justify-between text-left py-1">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              {/* Geolocation */}
+              <div className="flex items-center gap-1 text-slate-400">
+                <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="text-[10px] font-extrabold uppercase tracking-widest font-dmsans text-indigo-300/80">
+                  {location.neighborhood || 'Nairobi'} • {location.county || 'Metro'}
+                </span>
+              </div>
+
+              {/* Action row (heart, share) */}
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowShareTooltip(!showShareTooltip)}
+                    className="p-1.5 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all cursor-pointer"
+                    title="Share property"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                  {showShareTooltip && (
+                    <div className="absolute right-0 bottom-full mb-2 w-44 bg-[#121324] border border-white/10 rounded-2xl p-1 shadow-2xl z-50 flex flex-col">
+                      <button 
+                        onClick={handleCopyLink}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-[10px] text-slate-300 font-bold"
+                      >
+                        {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5 text-slate-500" />}
+                        {copiedLink ? 'Copied' : 'Copy link'}
+                      </button>
+                      <button 
+                        onClick={(e) => handleShareSocial(e, 'whatsapp')}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-[10px] text-emerald-400 font-extrabold"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        WhatsApp
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* HEART BUTTON AT TOP-RIGHT OF CARD/MEDIA IN GROUP */}
+                <button
+                  onClick={triggerFavoriteWithPulse}
+                  className={`p-1.5 rounded-xl transition-all active:scale-75 ${
+                    isFavorite 
+                      ? 'text-rose-500 bg-rose-500/10' 
+                      : 'text-slate-550 hover:text-rose-450 hover:bg-rose-500/5'
+                  }`}
+                >
+                  <Heart className={`w-4 h-4 ${isFavorite ? 'fill-rose-500 text-rose-505' : ''} ${pulseHeart ? 'animate-heart-pulse text-rose-500' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            <h3 className="text-lg font-extrabold font-syne text-white leading-snug group-hover:text-indigo-400 transition-colors">
+              {title}
+            </h3>
+            <span className="text-xs text-slate-400 block mt-1 font-dmsans font-semibold">{location.address}</span>
+          </div>
+
+          <div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3">
+              {/* Specs bar (beds, baths, size) */}
+              <div className="flex items-center gap-3 text-xs text-slate-200 font-bold font-dmsans">
+                <span className="flex items-center gap-1.5">
+                  <BedDouble className="w-4 h-4 text-indigo-400" />
+                  {details.bedrooms} {details.bedrooms === 1 ? 'Bed' : 'Beds'}
+                </span>
+                <span className="text-white/10">•</span>
+                <span className="flex items-center gap-1.5">
+                  <Bath className="w-4 h-4 text-indigo-400" />
+                  {details.bathrooms} {details.bathrooms === 1 ? 'Bath' : 'Baths'}
+                </span>
+                <span className="text-white/10">•</span>
+                <span className="flex items-center gap-1.5">
+                  <Maximize2 className="w-4 h-4 text-indigo-400" />
+                  {details.size} m²
+                </span>
+              </div>
+
+              {/* Amenity list indicators */}
+              {cardAmenities.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {visibleAmenities.map((amen, idx) => (
+                    <span key={idx} className="bg-white/5 border border-white/10 text-[9px] px-2 py-0.5 rounded-full text-slate-400 font-bold font-dmsans">
+                      {amen}
+                    </span>
+                  ))}
+                  {remainingCount > 0 && (
+                    <span className="bg-violet-500/15 border border-violet-500/20 text-[9px] px-2 py-0.5 rounded-full text-violet-400 font-black font-dmsans">
+                      +{remainingCount}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Landlord information footer block (Upgrade 4) */}
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+              <img 
+                src={author.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100'} 
+                alt={author.name} 
+                className="w-6 h-6 rounded-full object-cover border border-[#08080F]"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-black uppercase text-slate-300 font-dmsans tracking-wide">{author.name}</span>
+                <span className="text-[10px] text-slate-500 font-semibold font-mono">({author.role})</span>
+                {author.isVerified && (
+                  <span className="flex items-center gap-0.5 text-emerald-400 text-[9px] font-mono font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded-full uppercase ml-1">
+                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> VERIFIED
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // DEFAULT GRID VIEW FORMAT
   return (
     <motion.div
       id={`listing-card-${id}`}
       layout
-      whileHover={{ y: -6, transition: { duration: 0.2 } }}
+      whileHover={{ y: -6, scale: 1.015 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
       onClick={() => onSelect(id)}
-      className={`glass-premium-interactive h-full group/card cursor-pointer overflow-hidden rounded-3xl relative flex ${
-        viewFormat === 'list' ? 'flex-col md:flex-row gap-4 p-4' : 'flex-col'
-      } ${
+      className={`group bg-[#0E0F1C]/85 backdrop-blur-lg rounded-3xl overflow-hidden relative flex flex-col justify-between transition-all duration-300 border cursor-pointer hover:shadow-2xl hover:shadow-purple-950/30 ${
         isFeatured 
-          ? 'border-brand-gold/45 ring-1 ring-brand-gold/25 shadow-xl shadow-brand-gold/10 bg-gradient-to-br from-[#1b263b] to-brand-dark/40' 
-          : 'border-[#1e293b] hover:border-brand-blue/30'
+          ? 'border-amber-400/30 shadow-[0_0_20px_rgba(245,200,66,0.12)] bg-[#141528]/95 glow-gold-premium' 
+          : 'border-white/5 hover:border-white/10'
       }`}
     >
-      {/* Dynamic badging container (absolute over top of image) */}
-      <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5 pointer-events-none">
-        {isFeatured && (
-          <span className="flex items-center gap-1 bg-gradient-to-r from-brand-gold to-yellow-600 text-brand-dark text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md">
-            <Star className="w-3 h-3 fill-brand-dark text-brand-dark" />
-            Premium
-          </span>
+      {/* Photo takes top visual structure */}
+      <div className="relative w-full h-[200px] overflow-hidden shrink-0 bg-[#0E0F1C]">
+        {!imageLoaded && (
+          <div className="absolute inset-0 animate-skeleton z-10" />
         )}
-        {isNew() && (
-          <span className="bg-brand-blue text-white text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md">
-            New
-          </span>
-        )}
-        <span className="bg-brand-dark/85 backdrop-blur-md text-gray-200 text-[9px] font-medium font-mono px-2.5 py-1 rounded-full border border-white/5">
-          {propertyType}
-        </span>
-      </div>
-
-      {/* Image Gallery wrapper */}
-      <div className={`relative ${viewFormat === 'list' ? 'w-full md:w-72 h-48 md:h-full rounded-2xl' : 'w-full h-56'} overflow-hidden rounded-t-2xl md:rounded-t-3xl`}>
         {media.images && media.images.length > 0 ? (
           <img
             src={media.images[currentImageIdx]?.url}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+            onLoad={() => setImageLoaded(true)}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="w-full h-full bg-slate-800 flex items-center justify-center text-gray-500 text-xs font-mono">
-            No Media Loaded
+          <div className="w-full h-full bg-[#121324] flex items-center justify-center text-slate-500 text-xs font-mono">
+            No image available
           </div>
         )}
 
-        {/* Carousel Prev/Next Buttons (Visible on hover) */}
+        {/* Gradient Overlay on Photo */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#08080F] via-transparent to-black/35"></div>
+
+        {/* Swipe arrows inside thumbnail */}
         {media.images && media.images.length > 1 && (
-          <div className="absolute inset-0 flex items-center justify-between px-3 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-x-2.5 top-1/2 -translate-y-1/2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
             <button
               onClick={handlePrevImage}
-              className="w-8 h-8 rounded-full bg-brand-dark/80 hover:bg-brand-dark text-white flex items-center justify-center border border-white/5 shadow-md hover:scale-110 active:scale-95 transition-all"
+              className="w-6 h-6 rounded-full bg-[#08080F]/80 backdrop-blur-md hover:bg-[#08080F] text-white flex items-center justify-center border border-white/10 shadow-sm active:scale-[0.8] transition-all cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleNextImage}
-              className="w-8 h-8 rounded-full bg-brand-dark/80 hover:bg-brand-dark text-white flex items-center justify-center border border-white/5 shadow-md hover:scale-110 active:scale-95 transition-all"
+              className="w-6 h-6 rounded-full bg-[#08080F]/80 backdrop-blur-md hover:bg-[#08080F] text-white flex items-center justify-center border border-white/10 shadow-sm active:scale-[0.8] transition-all cursor-pointer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
-        {/* Indicators dot bar */}
-        {media.images && media.images.length > 1 && (
-          <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1">
-            {media.images.map((_, idx) => (
-              <span
-                key={idx}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  idx === currentImageIdx ? 'bg-brand-blue w-3' : 'bg-white/40'
-                }`}
-              />
-            ))}
-          </div>
-        )}
+        {/* Badges top-left of image */}
+        <div className="absolute top-2.5 left-2.5 z-10 flex flex-wrap gap-1 pointer-events-none">
+          {isFeatured && (
+            <span className="flex items-center gap-1 bg-[#F5C842] text-black text-[8px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md font-dmsans animate-gold-shimmer">
+              ★ PREMIUM
+            </span>
+          )}
+          {isNew && (
+            <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 shadow-md">
+              <Sparkles className="w-2.5 h-2.5" /> NEW
+            </span>
+          )}
+          {isHot && (
+            <span className="bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 shadow-md animate-pulse">
+              <Flame className="w-2.5 h-2.5" /> HOT
+            </span>
+          )}
+          {isExpiring && (
+            <span className="bg-amber-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 shadow-md">
+              <Clock className="w-2.5 h-2.5" /> EXPIRING
+            </span>
+          )}
+        </div>
+
+        {/* Favorite button top-right of photo overlay */}
+        <div className="absolute top-2.5 right-2.5 z-25 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={triggerFavoriteWithPulse}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all bg-[#08080F]/65 hover:bg-[#08080F] backdrop-blur-md cursor-pointer border border-white/10 ${
+              isFavorite 
+                ? 'text-rose-500 ring-2 ring-rose-500/20' 
+                : 'text-slate-350 hover:text-rose-405'
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''} ${pulseHeart ? 'animate-heart-pulse text-rose-500' : ''}`} />
+          </button>
+        </div>
+
+        {/* Price overlay at bottom, highly stylized bold */}
+        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between pointer-events-none z-10">
+          <span className="text-base font-black text-white text-shadow-subtle font-syne">
+            {formattedPrice()}
+          </span>
+          <span className="text-[10px] text-slate-300 font-black font-dmsans uppercase tracking-wider bg-black/50 px-2 py-0.5 rounded-md backdrop-blur-xs">
+            / mth
+          </span>
+        </div>
+
+        {/* Detail hover sliding backdrop overlay */}
+        <div className="absolute inset-x-0 bottom-0 top-0 bg-[#0E0F1C]/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300 pointer-events-none">
+          <span className="bg-gradient-to-r from-violet-605 via-fuchsia-600 to-indigo-605 text-white text-[10px] font-syne font-black px-5 py-2.5 rounded-xl shadow-xl transform translate-y-3 group-hover:translate-y-0 transition-transform duration-300 tracking-wider">
+            VIEW DETAILS
+          </span>
+        </div>
       </div>
 
-      {/* Context info split */}
-      <div className={`p-5 flex-1 flex flex-col justify-between ${viewFormat === 'list' && 'md:p-2'}`}>
-        
+      {/* Content bottom section */}
+      <div className="p-4 flex-grow flex flex-col justify-between text-left">
         <div>
-          {/* First line: Location & Actions */}
-          <div className="flex items-center justify-between gap-1 mb-1.5">
-            <div className="flex items-center gap-1 text-brand-gold">
-              <MapPin className="w-3.5 h-3.5 text-brand-gold shrink-0" />
-              <span className="text-[11px] font-mono tracking-wider font-extrabold uppercase text-brand-gold truncate max-w-[200px] md:max-w-xs">
-                {location.neighborhood} • {location.county || 'Nairobi'}
+          <div className="flex items-center justify-between mb-1.5">
+            {/* Geolocation */}
+            <div className="flex items-center gap-1 text-slate-400">
+              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[9px] font-bold uppercase tracking-widest font-dmsans text-indigo-300/80 truncate max-w-[190px]">
+                {location.neighborhood || 'Nairobi'} • {location.county || 'Metro'}
               </span>
             </div>
 
-            {/* Quick Actions Bar */}
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-              
-              {/* Share Trigger */}
-              <div className="relative">
-                <button
-                  id={`share-btn-${id}`}
-                  onClick={() => setShowShareTooltip(!showShareTooltip)}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
-                  title="Share Asset"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-                
-                {showShareTooltip && (
-                  <div className="absolute right-0 bottom-full mb-2 w-48 glass-premium border border-white/10 rounded-xl p-2 shadow-2xl z-40 flex flex-col gap-1">
-                    <button 
-                      onClick={handleCopyLink}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-gray-200"
-                    >
-                      {copiedLink ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Link2 className="w-3.5 h-3.5 text-brand-blue" />}
-                      {copiedLink ? 'Copied' : 'Copy Listing Link'}
-                    </button>
-                    <button 
-                      onClick={(e) => handleShareSocial(e, 'whatsapp')}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-gray-200"
-                    >
-                      <Send className="w-3.5 h-3.5 text-green-500" />
-                      Send to WhatsApp
-                    </button>
-                    <button 
-                      onClick={(e) => handleShareSocial(e, 'twitter')}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-gray-200"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-brand-blue" />
-                      Share to Twitter
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Heart Switcher */}
+            {/* Social Share Trigger */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button
-                id={`favorite-btn-${id}`}
-                onClick={(e) => onToggleFavorite(id, e)}
-                className={`p-1.5 rounded-lg transition-all ${
-                  isFavorite 
-                    ? 'bg-red-500/10 text-red-500 ring-1 ring-red-500/30' 
-                    : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-red-400'
-                }`}
+                onClick={() => setShowShareTooltip(!showShareTooltip)}
+                className="p-1 rounded-lg hover:bg-[#121324] text-slate-500 hover:text-white transition-colors"
+                title="Share property"
               >
-                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500' : ''}`} />
+                <Share2 className="w-3.5 h-3.5" />
               </button>
-            </div>
-          </div>
-
-          {/* Title */}
-          <h4 className="text-base font-serif font-semibold text-white tracking-tight leading-tight group-hover/card:text-brand-blue transition-colors duration-200 line-clamp-1 mb-1">
-            {title}
-          </h4>
-          <span className="text-[10px] text-gray-400 font-mono block mb-2">{location.address}</span>
-
-          {/* neighborhood pill */}
-          <div className="flex gap-1 mb-4 flex-wrap">
-            {location.tags.slice(0, 2).map((tag, idx) => (
-              <span key={idx} className="text-[9px] font-mono tracking-wider bg-brand-blue/10 border border-brand-blue/20 text-brand-blue font-semibold px-2 py-0.5 rounded-full uppercase">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Third segment: price and details combo */}
-        <div>
-          {/* Beds / Baths / Area Specs */}
-          <div className="flex items-center justify-between border-t border-b border-white/5 py-2.5 mb-3.5 text-gray-300 font-mono text-[11px]">
-            <span className="flex items-center gap-1">
-              <BedDouble className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-              {details.bedrooms} {details.bedrooms > 1 ? 'Beds' : 'Bed'}
-            </span>
-            <span className="flex items-center gap-1">
-              <Bath className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-              {details.bathrooms} {details.bathrooms > 1 ? 'Baths' : 'Bath'}
-            </span>
-            <span className="flex items-center gap-1">
-              <Maximize2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-              {details.size} {details.sizeUnit}
-            </span>
-          </div>
-
-          {/* Author avatar & Price block */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <img 
-                src={author.avatar} 
-                alt={author.name} 
-                className="w-7 h-7 rounded-full object-cover border border-white/10" 
-                referrerPolicy="no-referrer"
-              />
-              <div className="leading-none">
-                <div className="flex items-center gap-0.5">
-                  <span className="text-[10px] text-gray-200 font-medium block truncate max-w-[80px]">{author.name}</span>
-                  {author.isVerified && (
-                    <span className="inline-flex items-center justify-center bg-brand-gold/15 text-brand-gold text-[7px] font-black rounded-full w-3.5 h-3.5 border border-brand-gold/25" title="KYC Verified Representative">
-                      ✓
-                    </span>
-                  )}
+              {showShareTooltip && (
+                <div className="absolute right-0 bottom-full mb-1.5 w-44 bg-[#121324] border border-white/10 rounded-2xl p-1 shadow-2xl z-50 flex flex-col">
+                  <button 
+                    onClick={handleCopyLink}
+                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 text-[10px] text-slate-300 font-bold"
+                  >
+                    {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5 text-slate-505" />}
+                    {copiedLink ? 'Copied' : 'Copy link'}
+                  </button>
+                  <button 
+                    onClick={(e) => handleShareSocial(e, 'whatsapp')}
+                    className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 text-[10px] text-emerald-400 font-extrabold"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    WhatsApp
+                  </button>
                 </div>
-                <span className="text-[8px] text-gray-500 font-mono uppercase">{author.role}</span>
-              </div>
+              )}
             </div>
+          </div>
 
-            <div className="text-right">
-              <p className="text-lg font-serif font-bold text-white leading-none">
-                {formattedPrice()}
-              </p>
-              <p className="text-[10px] text-gray-400 font-mono uppercase mt-0.5">
-                {pricing.frequency === 'monthly' ? '/ Month' : `/${pricing.frequency}`}
-              </p>
+          <h3 className="text-base font-extrabold font-syne text-white leading-snug truncate group-hover:text-indigo-400 transition-colors">
+            {title}
+          </h3>
+          <span className="text-[11px] text-slate-400 block truncate font-dmsans mt-0.5 font-semibold">{location.address}</span>
+        </div>
+
+        {/* Stats segment description */}
+        <div className="mt-3.5 pt-3.5 border-t border-white/5 space-y-2.5">
+          <div className="flex items-center justify-between text-xs text-slate-300 font-bold font-dmsans">
+            <span className="flex items-center gap-1">
+              <BedDouble className="w-3.5 h-3.5 text-indigo-400" />
+              {details.bedrooms} {details.bedrooms === 1 ? 'Bed' : 'Beds'}
+            </span>
+            <span className="text-white/10">•</span>
+            <span className="flex items-center gap-1">
+              <Bath className="w-3.5 h-3.5 text-indigo-400" />
+              {details.bathrooms} {details.bathrooms === 1 ? 'Bath' : 'Baths'}
+            </span>
+            <span className="text-white/10">•</span>
+            <span className="flex items-center gap-1">
+              <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+              {details.size} m²
+            </span>
+          </div>
+
+          {/* Render limited display details */}
+          {cardAmenities.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {visibleAmenities.map((amen, idx) => (
+                <span key={idx} className="bg-white/5 border border-white/10 text-[9px] px-1.5 py-0.5 rounded-full text-slate-400 font-bold font-dmsans">
+                  {amen}
+                </span>
+              ))}
+              {remainingCount > 0 && (
+                <span className="bg-violet-500/10 border border-violet-500/20 text-[9px] px-1.5 py-0.5 rounded-full text-violet-400 font-black font-dmsans">
+                  +{remainingCount}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Landlord information footer block (Upgrade 4) */}
+          <div className="flex items-center gap-2 pt-2.5 border-t border-white/5">
+            <img 
+              src={author.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100'} 
+              alt={author.name} 
+              className="w-5.5 h-5.5 rounded-full object-cover border border-[#08080F]"
+              referrerPolicy="no-referrer"
+            />
+            <div className="flex items-center justify-between flex-1 min-w-0">
+              <div className="flex items-center gap-0.5 min-w-0">
+                <span className="text-[10px] font-black uppercase text-slate-300 font-dmsans tracking-wide truncate">{author.name}</span>
+                {author.isVerified && <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />}
+              </div>
+              <span className="text-[8px] font-mono font-bold text-slate-500 uppercase shrink-0">{author.role}</span>
             </div>
           </div>
         </div>
-
       </div>
     </motion.div>
   );
