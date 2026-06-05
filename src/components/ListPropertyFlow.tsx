@@ -1237,13 +1237,13 @@ export default function ListPropertyFlow({
             </UploadErrorBoundary>
           )}
 
-          {/* STEP 5 - MAP LOCATE */}
+          {/* STEP 5 - PROPERTY LOCATION */}
           {currentStep === 5 && (
             <div className="max-w-2xl mx-auto space-y-5">
               <div className="text-center space-y-2">
                 <MapPin className="w-7 h-7 text-[#60A5FA] mx-auto animate-bounce" />
-                <h4 className="text-lg sm:text-2xl font-syne font-extrabold text-white">Pinpoint Location Coordinates</h4>
-                <p className="text-xs text-gray-400">Lock your GPS coordinates to display precise search-matches on live tenant dashboards.</p>
+                <h4 className="text-lg sm:text-2xl font-syne font-extrabold text-white">Property Location details</h4>
+                <p className="text-xs text-gray-400">Specify exact address and neighborhood of your property for prospective tenants.</p>
               </div>
 
               {/* SEARCH AUTOROUTE Suggestion bar */}
@@ -1325,62 +1325,7 @@ export default function ListPropertyFlow({
                 </div>
               </div>
 
-              {/* FAKE MAP WORKSPACE SPACE WITH RADAR PINGS */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-gray-400 font-mono uppercase">GIS interactive vector alignment</span>
-                  
-                  {/* GPS LOCATOR TRIGGER BUTTON */}
-                  <button
-                    type="button"
-                    onClick={triggerGpsLookup}
-                    className="relative text-[9px] font-mono cursor-pointer font-extrabold uppercase bg-[#60A5FA]/10 hover:bg-[#60A5FA]/20 border border-[#60A5FA]/20 py-1.5 px-3 rounded-lg text-[#60A5FA] flex items-center gap-1 transition-all"
-                  >
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#60A5FA] opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#60A5FA]"></span>
-                    </span>
-                    {isLocating ? 'Locating...' : 'Lock GPS Coordinates'}
-                  </button>
-                </div>
 
-                {/* INTERACTIVE VECTOR GRID MAP */}
-                <div 
-                  onClick={handleMapGridClick}
-                  className="relative w-full h-44 sm:h-52 bg-[#04050d] rounded-2xl border border-white/10 overflow-hidden flex items-center justify-center cursor-crosshair group"
-                >
-                  {/* GRID LINES AS REQUESTED */}
-                  <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:22px_22px]" />
-                  
-                  {/* COMPASS COMPACT HUD CARD */}
-                  <div className="absolute top-3 left-3 bg-[#0e101f]/90 border border-white/10 px-2 py-1 rounded-sm font-mono text-[8px] text-[#60A5FA] uppercase select-none flex items-center gap-1">
-                    <span>🧭 LOCK POINT:</span>
-                    <span className="text-white font-bold">{markerCoordinates.lat.toFixed(4)}, {markerCoordinates.lng.toFixed(4)}</span>
-                  </div>
-
-                  {/* DYNAMIC ANIMATED VECTOR PIN RADAR */}
-                  <div className="relative z-10 transition-transform duration-700">
-                    <div className="w-8 h-8 rounded-full bg-[#60A5FA]/25 border border-[#60A5FA]/40 flex items-center justify-center animate-ping absolute -inset-2"></div>
-                    <div className="w-4 h-4 rounded-full bg-[#60A5FA] border-2 border-white flex items-center justify-center relative z-20 shadow-xl">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
-                    </div>
-                  </div>
-
-                  {/* RING GLINT ON SELECTION MATCH FOUND */}
-                  {isLocating && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20">
-                      <div className="text-center space-y-2 animate-pulse">
-                        <div className="w-9 h-9 border-2 border-t-transparent border-[#60A5FA] rounded-full animate-spin mx-auto"></div>
-                        <span className="block font-mono text-[9px] uppercase tracking-widest text-[#60A5FA]">Scanning Metropolitan Satellites...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <span className="absolute bottom-3 right-3 text-[9px] font-mono text-gray-500 bg-black/50 px-2 py-0.5 rounded select-none">
-                    Click Grid lines to drop simulated Coordinate Pins
-                  </span>
-                </div>
-              </div>
 
               {/* NEIGHBORHOOD BADGES TAGS SECTION */}
               <div className="space-y-1.5 pt-1">

@@ -329,34 +329,6 @@ export default function PropertyDetail({
             </div>
           )}
 
-          {/* Google Maps Styled Preview Widget (Upgrade 6) */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xs font-syne font-black text-indigo-400 uppercase tracking-widest font-mono">Real-world Geospatial Locator</h2>
-              <span className="text-[9px] text-[#4CAF50] font-mono font-bold tracking-wide flex items-center gap-0.5 uppercase">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Satellites Synced
-              </span>
-            </div>
-            
-            <div className="relative h-[160px] rounded-2xl overflow-hidden border border-white/10 bg-slate-900">
-              {/* Dark Map Mockup with beautiful filters */}
-              <img 
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=650&h=200"
-                alt="Static Vetted Coordinates"
-                className="w-full h-full object-cover brightness-[0.35] contrast-[1.25] saturate-[0.8]"
-              />
-              {/* Pulsing beacon marker overlay directly centers */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="relative">
-                  <span className="absolute -top-3.5 -left-3.5 w-10.5 h-10.5 bg-indigo-500/20 border-2 border-indigo-450 rounded-full animate-ping" />
-                  <div className="w-3.5 h-3.5 bg-indigo-400 border border-white rounded-full shadow-lg relative z-10" />
-                </div>
-                <div className="bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[9px] font-bold font-mono text-indigo-300 mt-2.5 shadow-xl uppercase">
-                  Vetted Sector: {location.neighborhood || 'Nairobi'}
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Vetted Representative Card */}
           <div className="bg-[#121324] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
