@@ -9,7 +9,17 @@ import { isSupabaseActive, dbService } from "./supabase-service.js";
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+
+// Set up maximum JSON body size limits to allow 5MB base64 images uploads
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// Ensure uploads directory exists and mount statically
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR));
 
 // Enable highly flexible and robust CORS middleware
 app.use((req, res, next) => {
@@ -294,7 +304,7 @@ app.post("/api/auth/login", async (req, res) => {
   });
 });
 
-// Profile fetching
+// Profile fetching with deep profile fields integration
 app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
   let user: any;
 
@@ -313,6 +323,7 @@ app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
   if (!user) {
     return res.status(404).json({ success: false, error: "User profile from token was not found" });
   }
+
   res.json({
     success: true,
     user: {
@@ -321,8 +332,234 @@ app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
       name: user.name,
       role: user.role,
       phone: user.phone,
+      avatarUrl: user.avatarUrl || "",
+      bio: user.bio || "",
+      location: user.location || "Nairobi, Kenya",
+      preferredContact: user.preferredContact || "Email",
+      twoFactorEnabled: user.twoFactorEnabled || false,
+      notificationPrefs: user.notificationPrefs || { email: true, sms: true, push: true },
+      privacySettings: user.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+      agencyName: user.agencyName || "",
+      businessLogo: user.businessLogo || "",
+      businessDescription: user.businessDescription || "",
+      officeLocation: user.officeLocation || "",
+      businessContact: user.businessContact || "",
+      isVerified: user.isVerified !== undefined ? user.isVerified : true,
+      createdAt: user.createdAt || new Date().toISOString(),
       favorites: user.favorites || []
     }
+  });
+});
+
+// Update Profile details
+app.put("/api/auth/profile", authenticateToken, async (req: any, res) => {
+  const db = loadDB();
+  const user = db.users.find((u: any) => u.id === req.user.userId);
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Authorized profile session not found" });
+  }
+
+  const {
+    name,
+    phone,
+    bio,
+    location,
+    preferredContact,
+    notificationPrefs,
+    privacySettings,
+    agencyName,
+    businessLogo,
+    businessDescription,
+    officeLocation,
+    businessContact,
+    twoFactorEnabled
+  } = req.body;
+
+  // Set properties securely
+  if (name !== undefined) user.name = name;
+  if (phone !== undefined) user.phone = phone;
+  if (bio !== undefined) user.bio = bio;
+  if (location !== undefined) user.location = location;
+  if (preferredContact !== undefined) user.preferredContact = preferredContact;
+  if (twoFactorEnabled !== undefined) user.twoFactorEnabled = twoFactorEnabled;
+  if (notificationPrefs !== undefined) user.notificationPrefs = notificationPrefs;
+  if (privacySettings !== undefined) user.privacySettings = privacySettings;
+
+  // Landlord Specific Details
+  if (agencyName !== undefined) user.agencyName = agencyName;
+  if (businessLogo !== undefined) user.businessLogo = businessLogo;
+  if (businessDescription !== undefined) user.businessDescription = businessDescription;
+  if (officeLocation !== undefined) user.officeLocation = officeLocation;
+  if (businessContact !== undefined) user.businessContact = businessContact;
+
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: "Profile updated successfully inside secured database.",
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      phone: user.phone,
+      avatarUrl: user.avatarUrl || "",
+      bio: user.bio || "",
+      location: user.location || "Nairobi, Kenya",
+      preferredContact: user.preferredContact || "Email",
+      twoFactorEnabled: user.twoFactorEnabled || false,
+      notificationPrefs: user.notificationPrefs || { email: true, sms: true, push: true },
+      privacySettings: user.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+      agencyName: user.agencyName || "",
+      businessLogo: user.businessLogo || "",
+      businessDescription: user.businessDescription || "",
+      officeLocation: user.officeLocation || "",
+      businessContact: user.businessContact || "",
+      isVerified: user.isVerified !== undefined ? user.isVerified : true,
+      createdAt: user.createdAt || new Date().toISOString(),
+      favorites: user.favorites || []
+    }
+  });
+});
+
+// Secure Avatar photo store and replace
+app.post("/api/auth/upload-avatar", authenticateToken, async (req: any, res) => {
+  const { image } = req.body;
+  
+  if (!image) {
+    return res.status(400).json({ success: false, error: "Image payload is missing." });
+  }
+
+  // Handle Base64 decode securely of JPG, PNG, and WebP
+  const matches = image.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+  if (!matches) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "Invalid image format. Provide a valid base64 representation of PNG, JPG, or WebP." 
+    });
+  }
+
+  const rawExt = matches[1].toLowerCase();
+  let ext = "png";
+  if (rawExt === "jpeg" || rawExt === "jpg") ext = "jpg";
+  else if (rawExt === "webp") ext = "webp";
+  else if (rawExt !== "png") {
+    return res.status(400).json({ success: false, error: "Only JPG, PNG, and WebP image uploads are allowed." });
+  }
+
+  const base64Data = matches[2];
+  const buffer = Buffer.from(base64Data, "base64");
+
+  // Restrict image content size to 5MB (5 * 1024 * 1024 bytes)
+  if (buffer.length > 5 * 1024 * 1024) {
+    return res.status(400).json({ success: false, error: "Profile photo exceeds strict system scale threshold of 5MB limit." });
+  }
+
+  // Save base64-generated files onto Node static folder
+  const fileName = `profile-${req.user.userId}-${Date.now()}.${ext}`;
+  const filePath = path.join(UPLOADS_DIR, fileName);
+
+  try {
+    fs.writeFileSync(filePath, buffer);
+    const relativeUrl = `/uploads/${fileName}`;
+
+    // Auto update in active database representation
+    const db = loadDB();
+    const user = db.users.find((u: any) => u.id === req.user.userId);
+    if (user) {
+      user.avatarUrl = relativeUrl;
+      saveDB(db);
+    }
+
+    res.json({
+      success: true,
+      avatarUrl: relativeUrl,
+      message: "Secure image crop processed and saved to persistent cloud folder."
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: `Writing secure file image failed: ${err.message}` });
+  }
+});
+
+// Delete active Avatar photo
+app.delete("/api/auth/delete-avatar", authenticateToken, async (req: any, res) => {
+  const db = loadDB();
+  const user = db.users.find((u: any) => u.id === req.user.userId);
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Authorized user not found" });
+  }
+
+  user.avatarUrl = "";
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: "Profile photo deleted successfully from the database."
+  });
+});
+
+// Secure Password Alteration
+app.post("/api/auth/change-password", authenticateToken, async (req: any, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, error: "Current password and new password are required." });
+  }
+
+  const db = loadDB();
+  const user = db.users.find((u: any) => u.id === req.user.userId);
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Authorized session not found." });
+  }
+
+  const inputHash = hashPassword(currentPassword);
+  if (user.passwordHash !== inputHash) {
+    return res.status(400).json({ success: false, error: "The current password credentials did not match secure identity logs." });
+  }
+
+  // Update password hash secure
+  user.passwordHash = hashPassword(newPassword);
+  saveDB(db);
+
+  res.json({
+    success: true,
+    message: "Identity password rotated successfully."
+  });
+});
+
+// Secure Email Alteration / Login Sync
+app.post("/api/auth/change-email", authenticateToken, async (req: any, res) => {
+  const { newEmail } = req.body;
+  if (!newEmail || !newEmail.includes("@")) {
+    return res.status(400).json({ success: false, error: "Please specify a valid new email address." });
+  }
+
+  const db = loadDB();
+  // Check duplicate
+  const duplicate = db.users.find((u: any) => u.email.toLowerCase() === newEmail.toLowerCase() && u.id !== req.user.userId);
+  if (duplicate) {
+    return res.status(400).json({ success: false, error: "This email address is already locked onto another registered partner dashboard." });
+  }
+
+  const user = db.users.find((u: any) => u.id === req.user.userId);
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Authorized user session not found." });
+  }
+
+  // Update email
+  user.email = newEmail;
+  saveDB(db);
+
+  // Generate a brand new token containing updated email claims to prevent token expiry discrepancy!
+  const refreshedToken = createToken(user);
+
+  res.json({
+    success: true,
+    token: refreshedToken,
+    email: newEmail,
+    message: "Master account email altered securely on state server. Session token regenerated."
   });
 });
 

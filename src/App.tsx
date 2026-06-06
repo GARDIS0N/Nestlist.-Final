@@ -46,6 +46,7 @@ import PropertyDetail from './components/PropertyDetail';
 import Dashboards from './components/Dashboards';
 import PaymentSandboxVisualizer from './components/PaymentSandboxVisualizer';
 import Login from './components/Login';
+import ProfilePage from './components/ProfilePage';
 
 import { checkExpiredListings } from './utils/paymentAndNotify';
 
@@ -1511,56 +1512,30 @@ export default function App() {
             </motion.div>
           )
 
-          // OPTION 5: PROFILE WRAPPER OR IN-DRAWER CONFIGS FALLBACK
+          // OPTION 4: COMPLETE ADVANCED PROFILE PAGE & ACCOUNT SETTINGS MANAGEMENT HUB
           : (
             <motion.div 
               key="profile"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-6 max-w-sm mx-auto px-4 py-12 text-center"
             >
-              <div className="bg-white p-6 rounded-3xl border border-slate-205 shadow-sm space-y-4 text-left">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={userProfile.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} 
-                    className="w-14 h-14 rounded-full border border-slate-200 object-cover" 
-                    alt="Authorized Account"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div>
-                    <h3 className="font-bold text-slate-800">{userProfile.fullName || 'Registered Guest'}</h3>
-                    <p className="text-xs text-slate-500 font-mono font-bold uppercase">{currentRole} • Tenant Account</p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-150 pt-3 space-y-2">
-                  <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Trust verification status</span>
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-[#4CAF50] shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-700 leading-tight">Identity verified successfully</p>
-                      <p className="text-[10px] text-slate-500 font-medium">Synced with Safaricom KYC Daraja Ledger API.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick actions inside settings */}
-                <div className="space-y-1.5 pt-2">
-                  <button 
-                    onClick={() => setAddListingOpen(true)}
-                    className="w-full text-center py-2.5 bg-[#1B3A6B] hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Post property listing classified
-                  </button>
-                  <button 
-                    onClick={handleLogout}
-                    className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 font-bold rounded-xl text-xs cursor-pointer active:scale-98"
-                  >
-                    Logout active session
-                  </button>
-                </div>
-              </div>
+              <ProfilePage
+                userProfile={userProfile}
+                onUpdateProfile={setUserProfile}
+                listings={listings}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
+                onSelectListing={(id) => {
+                  setSelectedListingId(id);
+                  setActiveTab('home');
+                }}
+                inquiries={inquiries}
+                notifications={notifications}
+                currentRole={currentRole}
+                onChangeRole={setCurrentRole}
+                onLogout={handleLogout}
+              />
             </motion.div>
           )
         }

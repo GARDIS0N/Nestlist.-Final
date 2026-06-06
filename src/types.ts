@@ -18,6 +18,16 @@ export interface Profile {
   kycStatus: 'unverified' | 'pending' | 'verified';
   createdAt: string;
   verificationId?: string;
+  location?: string;
+  preferredContact?: string;
+  twoFactorEnabled?: boolean;
+  notificationPrefs?: { email: boolean; sms: boolean; push: boolean };
+  privacySettings?: { publicProfile: boolean; searchIndexing: boolean; showContact: boolean };
+  agencyName?: string;
+  businessLogo?: string;
+  businessDescription?: string;
+  officeLocation?: string;
+  businessContact?: string;
 }
 
 export interface User {
