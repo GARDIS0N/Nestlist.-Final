@@ -15,6 +15,13 @@ export default defineConfig(() => {
       hmr: false,
       host: true,
       port: 3000,
+      watch: {
+        ignored: [
+          '**/src/data/**',
+          '**/uploads/**',
+          '**/database.json'
+        ]
+      }
     },
   };
 });

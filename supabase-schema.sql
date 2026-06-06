@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('Tenant', 'Agent', 'Landlord', 'Caretaker', 'Admin')),
     phone TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    bio TEXT DEFAULT '',
     is_verified BOOLEAN DEFAULT TRUE,
     favorites JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()

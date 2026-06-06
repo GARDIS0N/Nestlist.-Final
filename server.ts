@@ -390,8 +390,11 @@ app.put("/api/auth/profile", authenticateToken, async (req: any, res) => {
 
   const {
     name,
+    fullName,
     phone,
+    contactPhone,
     bio,
+    avatarUrl,
     location,
     preferredContact,
     notificationPrefs,
@@ -405,9 +408,13 @@ app.put("/api/auth/profile", authenticateToken, async (req: any, res) => {
   } = req.body;
 
   // Set properties securely
-  if (name !== undefined) user.name = name;
-  if (phone !== undefined) user.phone = phone;
+  const resolvedName = name !== undefined ? name : fullName;
+  const resolvedPhone = phone !== undefined ? phone : contactPhone;
+
+  if (resolvedName !== undefined) user.name = resolvedName;
+  if (resolvedPhone !== undefined) user.phone = resolvedPhone;
   if (bio !== undefined) user.bio = bio;
+  if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
   if (location !== undefined) user.location = location;
   if (preferredContact !== undefined) user.preferredContact = preferredContact;
   if (twoFactorEnabled !== undefined) user.twoFactorEnabled = twoFactorEnabled;
@@ -510,13 +517,13 @@ app.post("/api/auth/upload-avatar", authenticateToken, async (req: any, res) => 
     const db = loadDB();
     const user = db.users.find((u: any) => u.id === req.user.userId);
     if (user) {
-      user.avatarUrl = relativeUrl;
+      user.avatarUrl = image; // Storing the robust base64 schema URL in the database
       saveDB(db);
     }
 
     if (isSupabaseActive()) {
       try {
-        await dbService.updateUser(req.user.userId, { avatarUrl: relativeUrl });
+        await dbService.updateUser(req.user.userId, { avatarUrl: image });
       } catch (err: any) {
         console.warn("⚠️ Got Supabase error while updating user avatar Url:", err.message);
       }
@@ -524,8 +531,8 @@ app.post("/api/auth/upload-avatar", authenticateToken, async (req: any, res) => 
 
     res.json({
       success: true,
-      avatarUrl: relativeUrl,
-      message: "Secure image crop processed and saved to persistent cloud folder."
+      avatarUrl: image,
+      message: "Secure image crop processed and saved to persistent cloud database."
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: `Writing secure file image failed: ${err.message}` });

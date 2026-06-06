@@ -472,12 +472,18 @@ export default function PropertyDetail({
           {/* Vetted Representative Card */}
           <div className="bg-[#121324] border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img 
-                src={author.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100'} 
-                alt={author.name} 
-                className="w-11 h-11 rounded-full object-cover border border-[#08080C] shrink-0"
-                referrerPolicy="no-referrer"
-              />
+              {author.avatar ? (
+                <img 
+                  src={author.avatar} 
+                  alt={author.name} 
+                  className="w-11 h-11 rounded-full object-cover border border-[#08080C] shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-sm font-black text-white border border-[#08080C] shrink-0">
+                  {author.name ? author.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "NL"}
+                </div>
+              )}
               <div className="leading-tight">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-extrabold text-white">{author.name}</span>

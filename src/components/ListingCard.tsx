@@ -282,12 +282,18 @@ export default function ListingCard({
 
             {/* Landlord information footer block (Upgrade 4) */}
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
-              <img 
-                src={author.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100'} 
-                alt={author.name} 
-                className="w-6 h-6 rounded-full object-cover border border-[#08080F]"
-                referrerPolicy="no-referrer"
-              />
+              {author.avatar ? (
+                <img 
+                  src={author.avatar} 
+                  alt={author.name} 
+                  className="w-6 h-6 rounded-full object-cover border border-[#08080F]"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[9px] font-black text-white border border-[#08080F]">
+                  {author.name ? author.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "NL"}
+                </div>
+              )}
               <div className="flex items-center gap-1">
                 <span className="text-[10px] font-black uppercase text-slate-300 font-dmsans tracking-wide">{author.name}</span>
                 <span className="text-[10px] text-slate-500 font-semibold font-mono">({author.role})</span>
@@ -499,12 +505,18 @@ export default function ListingCard({
 
           {/* Landlord information footer block (Upgrade 4) */}
           <div className="flex items-center gap-2 pt-2.5 border-t border-white/5">
-            <img 
-              src={author.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100'} 
-              alt={author.name} 
-              className="w-5.5 h-5.5 rounded-full object-cover border border-[#08080F]"
-              referrerPolicy="no-referrer"
-            />
+            {author.avatar ? (
+              <img 
+                src={author.avatar} 
+                alt={author.name} 
+                className="w-5.5 h-5.5 rounded-full object-cover border border-[#08080F]"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-5.5 h-5.5 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[8px] font-black text-white border border-[#08080F]">
+                {author.name ? author.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "NL"}
+              </div>
+            )}
             <div className="flex items-center justify-between flex-1 min-w-0">
               <div className="flex items-center gap-0.5 min-w-0">
                 <span className="text-[10px] font-black uppercase text-slate-300 font-dmsans tracking-wide truncate">{author.name}</span>

@@ -124,6 +124,18 @@ export default function App() {
     createdAt: new Date().toISOString()
   });
 
+  const registerProfileUpdate = (updater: Profile | ((prev: Profile) => Profile)) => {
+    setUserProfile(prev => {
+      const updated = typeof updater === 'function' ? updater(prev) : updater;
+      if (updated.fullName) localStorage.setItem('nestlist_name', updated.fullName);
+      if (updated.contactPhone) localStorage.setItem('nestlist_user_phone', updated.contactPhone);
+      if (updated.contactEmail) localStorage.setItem('nestlist_email', updated.contactEmail);
+      if (updated.avatarUrl !== undefined) localStorage.setItem('nestlist_avatar', updated.avatarUrl);
+      if (updated.bio !== undefined) localStorage.setItem('nestlist_bio', updated.bio);
+      return updated;
+    });
+  };
+
   // WIZARD CONTROLS
   const [addListingOpen, setAddListingOpen] = useState(false);
 
@@ -976,7 +988,7 @@ export default function App() {
         setActiveTab={(tab) => setActiveTab(tab as any)}
         onSelectPropertyId={setSelectedListingId}
         userProfile={userProfile}
-        onUpdateProfile={setUserProfile}
+        onUpdateProfile={registerProfileUpdate}
         isLoggedIn={isLoggedIn}
         setIsLoggedIn={setIsLoggedIn}
       />
@@ -1046,7 +1058,7 @@ export default function App() {
                 onToggleSavedSearchNotifications={handleToggleSavedSearchNotifications}
                 onTriggerSavedSearch={handleTriggerSavedSearch}
                 simulatedEmails={simulatedEmails}
-                onUpdateProfile={setUserProfile}
+                onUpdateProfile={registerProfileUpdate}
                 onActivateListing={handleActivateListing}
                 onLogout={handleLogout}
               />
@@ -1573,7 +1585,7 @@ export default function App() {
             >
               <ProfilePage
                 userProfile={userProfile}
-                onUpdateProfile={setUserProfile}
+                onUpdateProfile={registerProfileUpdate}
                 listings={listings}
                 favorites={favorites}
                 onToggleFavorite={handleToggleFavorite}

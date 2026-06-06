@@ -242,12 +242,18 @@ export default function Navbar({
               onClick={() => navigateTab('profile')}
               className="flex items-center gap-2 p-1 pl-1 pr-1 md:pr-3 rounded-full hover:bg-white/5 border border-white/10 transition-all cursor-pointer text-slate-305"
             >
-              <img 
-                src={userProfile.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150'} 
-                alt={userProfile.fullName} 
-                className="w-7 h-7 rounded-full object-cover border border-[#08080F]"
-                referrerPolicy="no-referrer"
-              />
+              {userProfile.avatarUrl ? (
+                <img 
+                  src={userProfile.avatarUrl} 
+                  alt={userProfile.fullName} 
+                  className="w-7 h-7 rounded-full object-cover border border-[#08080F]"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white border border-[#08080F]">
+                  {userProfile.fullName ? userProfile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'NL'}
+                </div>
+              )}
               <span className="hidden md:inline text-xs font-bold text-slate-300">
                 {userProfile.fullName.split(' ')[0]}
               </span>
