@@ -20,7 +20,7 @@ import {
 import { UserRole } from '../types';
 
 interface LoginProps {
-  onLoginSuccess: (role: UserRole, email: string, name: string, token: string, phone: string, avatarUrl?: string) => void;
+  onLoginSuccess: (user: any, token: string) => void;
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
@@ -126,27 +126,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     setStatusMessage("Login successful! Loading your dashboard...");
     
-    const avatarMap: Record<string, string> = {
-      'Tenant': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'Agent': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-      'Landlord': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150'
-    };
-
     // Stase local keys for backup offline verification
     localStorage.setItem('nestlist_role', data.user.role);
     localStorage.setItem('nestlist_email', data.user.email);
     localStorage.setItem('nestlist_name', data.user.name);
+    if (data.user.avatarUrl) localStorage.setItem('nestlist_avatar', data.user.avatarUrl);
+    if (data.user.bio) localStorage.setItem('nestlist_bio', data.user.bio);
 
     setTimeout(() => {
       setIsSubmitting(false);
-      onLoginSuccess(
-        data.user.role, 
-        data.user.email, 
-        data.user.name, 
-        data.token, 
-        data.user.phone || '',
-        avatarMap[data.user.role]
-      );
+      onLoginSuccess(data.user, data.token);
     }, 600);
   };
 
@@ -228,27 +217,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     setStatusMessage(`Successfully registered! Welcome ${fullName}.`);
 
-    const avatarMap: Record<string, string> = {
-      'Tenant': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-      'Agent': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-      'Landlord': 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150'
-    };
-
     // Stase local keys for backup offline verification
     localStorage.setItem('nestlist_role', data.user.role);
     localStorage.setItem('nestlist_email', data.user.email);
     localStorage.setItem('nestlist_name', data.user.name);
+    if (data.user.avatarUrl) localStorage.setItem('nestlist_avatar', data.user.avatarUrl);
+    if (data.user.bio) localStorage.setItem('nestlist_bio', data.user.bio);
 
     setTimeout(() => {
       setIsSubmitting(false);
-      onLoginSuccess(
-        data.user.role,
-        data.user.email,
-        data.user.name,
-        data.token,
-        data.user.phone || '',
-        avatarMap[data.user.role]
-      );
+      onLoginSuccess(data.user, data.token);
     }, 600);
   };
 
@@ -272,13 +250,35 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        onLoginSuccess(selectedRole, "user@nestlist.ke", "Google User", "MOCK_TOKEN", "+254700000000");
+        onLoginSuccess({
+          id: `google-${randomId}`,
+          email: `google.user.${randomId}@nestlist.ke`,
+          name: "Kenyan User",
+          role: selectedRole,
+          phone: "+254700000000",
+          avatarUrl: "",
+          bio: "",
+          isVerified: true,
+          createdAt: new Date().toISOString(),
+          favorites: []
+        }, "MOCK_TOKEN");
         return;
       }
 
-      onLoginSuccess(data.user.role, data.user.email, data.user.name, data.token, data.user.phone);
+      onLoginSuccess(data.user, data.token);
     } catch (err: any) {
-      onLoginSuccess(selectedRole, "kenya.guest@gmail.com", "Kenyan Guest", "MOCK_TOKEN", "+254712345678");
+      onLoginSuccess({
+        id: "guest-id",
+        email: "kenya.guest@gmail.com",
+        name: "Kenyan Guest",
+        role: selectedRole,
+        phone: "+254712345678",
+        avatarUrl: "",
+        bio: "",
+        isVerified: true,
+        createdAt: new Date().toISOString(),
+        favorites: []
+      }, "MOCK_TOKEN");
     } finally {
       setOauthLoading(false);
     }
@@ -690,7 +690,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 </button>
 
                 <button
-                  onClick={() => onLoginSuccess('Tenant', 'guest.user@nestlist.ke', 'Guest Tenant', 'MOCK_TOKEN', '+254700000000')}
+                  onClick={() => onLoginSuccess({
+                    id: 'guest-user',
+                    email: 'guest.user@nestlist.ke',
+                    name: 'Guest Tenant',
+                    role: 'Tenant',
+                    phone: '+254700000000',
+                    avatarUrl: '',
+                    bio: '',
+                    isVerified: true,
+                    createdAt: new Date().toISOString(),
+                    favorites: []
+                  }, 'MOCK_TOKEN')}
                   className="flex-1 h-12 hover:bg-slate-50 border border-transparent hover:border-slate-200 text-[#1B3A6B] text-xs font-mono font-bold tracking-wider uppercase transition-all rounded-xl cursor-pointer"
                 >
                   Skip & Browse (Tenant)

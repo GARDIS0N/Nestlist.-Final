@@ -57,6 +57,8 @@ export function mapUserFromDB(row: any): any {
     passwordHash: row.password_hash,
     role: row.role,
     phone: row.phone || "",
+    avatarUrl: row.avatar_url || "",
+    bio: row.bio || "",
     isVerified: row.is_verified,
     favorites: Array.isArray(row.favorites) ? row.favorites : [],
     createdAt: row.created_at
@@ -72,6 +74,8 @@ export function mapUserToDB(user: any): any {
     password_hash: user.passwordHash,
     role: user.role,
     phone: user.phone || "",
+    avatar_url: user.avatarUrl || "",
+    bio: user.bio || "",
     is_verified: user.isVerified !== undefined ? user.isVerified : true,
     favorites: Array.isArray(user.favorites) ? JSON.stringify(user.favorites) : "[]",
     created_at: user.createdAt || new Date().toISOString()
@@ -253,6 +257,27 @@ export const dbService = {
       .eq("id", userId);
     if (error) {
       console.error("Supabase update favorites error:", error);
+      return false;
+    }
+    return true;
+  },
+
+  async updateUser(userId: string, updates: any): Promise<boolean> {
+    if (!supabase) return false;
+    const mapped: any = {};
+    if (updates.name !== undefined) mapped.name = updates.name;
+    if (updates.phone !== undefined) mapped.phone = updates.phone;
+    if (updates.avatarUrl !== undefined) mapped.avatar_url = updates.avatarUrl;
+    if (updates.bio !== undefined) mapped.bio = updates.bio;
+    if (updates.isVerified !== undefined) mapped.is_verified = updates.isVerified;
+    if (updates.favorites !== undefined) mapped.favorites = Array.isArray(updates.favorites) ? JSON.stringify(updates.favorites) : updates.favorites;
+
+    const { error } = await supabase
+      .from("users")
+      .update(mapped)
+      .eq("id", userId);
+    if (error) {
+      console.error("Supabase updateUser error:", error);
       return false;
     }
     return true;

@@ -259,7 +259,21 @@ app.post("/api/auth/register", async (req, res) => {
       name: newUser.name,
       role: newUser.role,
       phone: newUser.phone,
-      favorites: newUser.favorites
+      avatarUrl: newUser.avatarUrl || "",
+      bio: newUser.bio || "",
+      location: newUser.location || "Nairobi, Kenya",
+      preferredContact: newUser.preferredContact || "Email",
+      twoFactorEnabled: newUser.twoFactorEnabled || false,
+      notificationPrefs: newUser.notificationPrefs || { email: true, sms: true, push: true },
+      privacySettings: newUser.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+      agencyName: newUser.agencyName || "",
+      businessLogo: newUser.businessLogo || "",
+      businessDescription: newUser.businessDescription || "",
+      officeLocation: newUser.officeLocation || "",
+      businessContact: newUser.businessContact || "",
+      isVerified: newUser.isVerified !== undefined ? newUser.isVerified : true,
+      createdAt: newUser.createdAt || new Date().toISOString(),
+      favorites: newUser.favorites || []
     }
   });
 });
@@ -299,6 +313,20 @@ app.post("/api/auth/login", async (req, res) => {
       name: user.name,
       role: user.role,
       phone: user.phone,
+      avatarUrl: user.avatarUrl || "",
+      bio: user.bio || "",
+      location: user.location || "Nairobi, Kenya",
+      preferredContact: user.preferredContact || "Email",
+      twoFactorEnabled: user.twoFactorEnabled || false,
+      notificationPrefs: user.notificationPrefs || { email: true, sms: true, push: true },
+      privacySettings: user.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+      agencyName: user.agencyName || "",
+      businessLogo: user.businessLogo || "",
+      businessDescription: user.businessDescription || "",
+      officeLocation: user.officeLocation || "",
+      businessContact: user.businessContact || "",
+      isVerified: user.isVerified !== undefined ? user.isVerified : true,
+      createdAt: user.createdAt || new Date().toISOString(),
       favorites: user.favorites || []
     }
   });
@@ -395,6 +423,20 @@ app.put("/api/auth/profile", authenticateToken, async (req: any, res) => {
 
   saveDB(db);
 
+  if (isSupabaseActive()) {
+    try {
+      await dbService.updateUser(req.user.userId, {
+        name: user.name,
+        phone: user.phone,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        isVerified: user.isVerified
+      });
+    } catch (err: any) {
+      console.warn("⚠️ Got Supabase error when saving updated profile details:", err.message);
+    }
+  }
+
   res.json({
     success: true,
     message: "Profile updated successfully inside secured database.",
@@ -472,6 +514,14 @@ app.post("/api/auth/upload-avatar", authenticateToken, async (req: any, res) => 
       saveDB(db);
     }
 
+    if (isSupabaseActive()) {
+      try {
+        await dbService.updateUser(req.user.userId, { avatarUrl: relativeUrl });
+      } catch (err: any) {
+        console.warn("⚠️ Got Supabase error while updating user avatar Url:", err.message);
+      }
+    }
+
     res.json({
       success: true,
       avatarUrl: relativeUrl,
@@ -493,6 +543,14 @@ app.delete("/api/auth/delete-avatar", authenticateToken, async (req: any, res) =
 
   user.avatarUrl = "";
   saveDB(db);
+
+  if (isSupabaseActive()) {
+    try {
+      await dbService.updateUser(req.user.userId, { avatarUrl: "" });
+    } catch (err: any) {
+      console.warn("⚠️ Got Supabase error while deleting avatar Url:", err.message);
+    }
+  }
 
   res.json({
     success: true,

@@ -325,15 +325,36 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (data.success && data.user) {
-          setCurrentRole(data.user.role);
+          const u = data.user;
+          setCurrentRole(u.role);
           const savedPhone = localStorage.getItem('nestlist_user_phone') || '';
-          setUserProfile(prev => ({
-            ...prev,
-            fullName: data.user.name,
-            contactEmail: data.user.email,
-            contactPhone: savedPhone || data.user.phone || '',
-            kycStatus: data.user.role === 'Agent' || data.user.role === 'Landlord' ? 'verified' : 'pending'
-          }));
+          
+          if (u.avatarUrl) localStorage.setItem('nestlist_avatar', u.avatarUrl);
+          if (u.bio) localStorage.setItem('nestlist_bio', u.bio);
+
+          setUserProfile({
+            id: u.id,
+            userId: u.id,
+            username: u.email.split('@')[0],
+            fullName: u.name,
+            avatarUrl: u.avatarUrl || '',
+            bio: u.bio || '',
+            contactEmail: u.email,
+            contactPhone: savedPhone || u.phone || '',
+            location: u.location || 'Nairobi, Kenya',
+            preferredContact: u.preferredContact || 'Email',
+            twoFactorEnabled: u.twoFactorEnabled || false,
+            notificationPrefs: u.notificationPrefs || { email: true, sms: true, push: true },
+            privacySettings: u.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+            agencyName: u.agencyName || '',
+            businessLogo: u.businessLogo || '',
+            businessDescription: u.businessDescription || '',
+            officeLocation: u.officeLocation || '',
+            businessContact: u.businessContact || '',
+            isVerified: u.isVerified !== undefined ? u.isVerified : true,
+            kycStatus: u.role === 'Agent' || u.role === 'Landlord' ? 'verified' : 'pending',
+            createdAt: u.createdAt || new Date().toISOString()
+          });
           setIsLoggedIn(true);
         } else {
           localStorage.removeItem('nestlist_token');
@@ -345,6 +366,8 @@ export default function App() {
         const savedRole = localStorage.getItem('nestlist_role') as UserRole || 'Tenant';
         const savedEmail = localStorage.getItem('nestlist_email');
         const savedName = localStorage.getItem('nestlist_name');
+        const savedAvatar = localStorage.getItem('nestlist_avatar') || '';
+        const savedBio = localStorage.getItem('nestlist_bio') || '';
 
         if (savedEmail && savedRole) {
           setCurrentRole(savedRole);
@@ -353,6 +376,8 @@ export default function App() {
             fullName: savedName || prev.fullName,
             contactEmail: savedEmail,
             contactPhone: savedPhone || prev.contactPhone,
+            avatarUrl: savedAvatar || prev.avatarUrl,
+            bio: savedBio || prev.bio,
             kycStatus: savedRole === 'Agent' || savedRole === 'Landlord' ? 'verified' : 'pending'
           }));
           setIsLoggedIn(true);
@@ -878,24 +903,50 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('nestlist_token');
     localStorage.removeItem('nestlist_user_phone');
+    localStorage.removeItem('nestlist_role');
+    localStorage.removeItem('nestlist_email');
+    localStorage.removeItem('nestlist_name');
+    localStorage.removeItem('nestlist_avatar');
+    localStorage.removeItem('nestlist_bio');
     setIsLoggedIn(false);
     setCurrentRole('Tenant');
     setSelectedListingId(null);
     setActiveTab('home');
   };
 
-  const handleLoginSuccess = (role: UserRole, email: string, name: string, token: string, phone: string, avatarUrl?: string) => {
+  const handleLoginSuccess = (user: any, token: string) => {
     localStorage.setItem('nestlist_token', token);
-    localStorage.setItem('nestlist_user_phone', phone);
-    setCurrentRole(role);
-    setUserProfile(prev => ({
-      ...prev,
-      fullName: name,
-      contactEmail: email,
-      contactPhone: phone || prev.contactPhone,
-      avatarUrl: avatarUrl || prev.avatarUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-      kycStatus: role === 'Agent' || role === 'Landlord' ? 'verified' : 'pending'
-    }));
+    localStorage.setItem('nestlist_user_phone', user.phone || '');
+    localStorage.setItem('nestlist_role', user.role);
+    localStorage.setItem('nestlist_email', user.email);
+    localStorage.setItem('nestlist_name', user.name);
+    if (user.avatarUrl) localStorage.setItem('nestlist_avatar', user.avatarUrl);
+    if (user.bio) localStorage.setItem('nestlist_bio', user.bio);
+
+    setCurrentRole(user.role);
+    setUserProfile({
+      id: user.id || 'user-p1',
+      userId: user.id || 'current-user-id',
+      username: (user.email || 'guest').split('@')[0],
+      fullName: user.name || 'User Name',
+      avatarUrl: user.avatarUrl || '',
+      bio: user.bio || '',
+      contactEmail: user.email || '',
+      contactPhone: user.phone || '',
+      location: user.location || 'Nairobi, Kenya',
+      preferredContact: user.preferredContact || 'Email',
+      twoFactorEnabled: user.twoFactorEnabled || false,
+      notificationPrefs: user.notificationPrefs || { email: true, sms: true, push: true },
+      privacySettings: user.privacySettings || { publicProfile: true, searchIndexing: true, showContact: true },
+      agencyName: user.agencyName || '',
+      businessLogo: user.businessLogo || '',
+      businessDescription: user.businessDescription || '',
+      officeLocation: user.officeLocation || '',
+      businessContact: user.businessContact || '',
+      isVerified: user.isVerified !== undefined ? user.isVerified : true,
+      kycStatus: user.role === 'Agent' || user.role === 'Landlord' ? 'verified' : 'pending',
+      createdAt: user.createdAt || new Date().toISOString()
+    });
     setIsLoggedIn(true);
   };
 
