@@ -343,32 +343,32 @@ export default function Dashboards({
     setCheckoutFeedback({ text: "Connecting to payment gateway... Sending M-Pesa STK Push prompt to your phone.", type: 'info' });
 
     try {
-      const token = localStorage.getItem('nestlist_token');
-      const response = await fetch(getApiUrl('/api/payments/mpesa/stkpush'), {
+      const response = await fetch('https://nestlist-server.onrender.com/api/mpesa/stk', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           listingId,
-          phoneNumber: formattedPhone,
-          amount: amountPaid
+          phone: formattedPhone,
+          amount: amountPaid,
+          listingTitle: "NestList Premium Listing Activation"
         })
       });
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "M-Pesa push handshake failed.");
+        throw new Error(data.error || data.message || "M-Pesa push handshake failed.");
       }
 
-      if (data.success) {
-        setStkReference(data.checkoutRequestID);
-        setActivePaymentRecord({ id: data.paymentId, checkoutRequestID: data.checkoutRequestID, status: 'pending' });
+      if (data && (data.success || data.ResponseCode === '0' || data.checkoutId || data.CheckoutRequestID)) {
+        const checkoutId = data.checkoutId || data.CheckoutRequestID || data.checkoutRequestID || `SIM-${Date.now()}`;
+        setStkReference(checkoutId);
+        setActivePaymentRecord({ id: data.paymentId || `pay-${Date.now()}`, checkoutRequestID: checkoutId, status: 'pending' });
         setStkCountdown(60);
         setPaymentModalStep('stk_sent');
       } else {
-        throw new Error(data.error || "Daraja STK push failure.");
+        throw new Error(data.error || data.message || "Daraja STK push failure.");
       }
     } catch (err: any) {
       console.warn("⚠️ STK trigger failed, using offline simulation fallback", err);

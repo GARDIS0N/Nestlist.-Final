@@ -10,19 +10,19 @@ export function getApiUrl(path: string): string {
   // Ensure path starts with a slash
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
+  // If a custom API URL is provided in the build environment, use it
+  const customApiUrl = (import.meta as any).env?.VITE_API_URL;
+  if (customApiUrl) {
+    const cleanBase = customApiUrl.endsWith('/') ? customApiUrl.slice(0, -1) : customApiUrl;
+    return `${cleanBase}${cleanPath}`;
+  }
+
   // Check if running on localhost or the native Cloud Run deployment
   const hostname = window.location.hostname;
   const isNative = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('run.app');
 
   if (isNative) {
     return cleanPath;
-  }
-
-  // If a custom API URL is provided in the build environment, use it
-  const customApiUrl = (import.meta as any).env?.VITE_API_URL;
-  if (customApiUrl) {
-    const cleanBase = customApiUrl.endsWith('/') ? customApiUrl.slice(0, -1) : customApiUrl;
-    return `${cleanBase}${cleanPath}`;
   }
 
   // Allow manual dynamic override via localStorage

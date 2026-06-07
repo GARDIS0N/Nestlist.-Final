@@ -653,78 +653,35 @@ export default function ListPropertyFlow({
     throw new Error('All proxies failed. Using simulation mode.');
   };
 
-  // STEP 2 - Fix the STK Push request (client proxy approach)
+  // STEP 2 - Fix the STK Push request (live Onrender backend)
   const stkPush = async (phone: string, amount: number, listingId: string, listingTitle: string): Promise<{ success: boolean; checkoutId: any; message: string; simulated?: boolean; }> => {
     try {
-      const token = await getMpesaToken();
-      
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[^0-9]/g, '')
-        .slice(0, 14);
-      
-      const shortcode = '174379';
-      const passkey = 'bfb279f9aa9bdbcf158695eded2925d4da9a5745fa54a3bbc5c893fdea4d612';
-      const password = btoa(shortcode + passkey + timestamp);
-      
-      let formattedPhone = phone.toString().replace(/\s/g, '');
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '254' + formattedPhone.slice(1);
-      }
-      if (formattedPhone.startsWith('+')) {
-        formattedPhone = formattedPhone.slice(1);
-      }
-      
-      const payload = {
-        BusinessShortCode: shortcode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: 'CustomerPayBillOnline',
-        Amount: Math.ceil(amount),
-        PartyA: formattedPhone,
-        PartyB: shortcode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: 'https://nestlist.co.ke/api/mpesa/callback',
-        AccountReference: 'NESTLIST' + listingId.slice(0, 6).toUpperCase(),
-        TransactionDesc: 'NestList: ' + listingTitle.slice(0, 20)
-      };
-      
-      const stkUrl = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
-      
-      const proxies = [
-        'https://corsproxy.io/?',
-        'https://cors-anywhere.herokuapp.com/'
-      ];
-      
-      for (const proxy of proxies) {
-        try {
-          const response = await fetch(proxy + stkUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer ' + token,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-          
-          const result = await response.json();
-          
-          if (result.ResponseCode === '0' || result.CheckoutRequestID) {
-            return {
-              success: true,
-              checkoutId: result.CheckoutRequestID,
-              message: 'STK Push sent! Check your phone.',
-              simulated: false
-            };
-          }
-        } catch (err: any) {
-          console.warn('STK proxy failed:', err.message);
-          continue;
+      const res = await fetch(
+        'https://nestlist-server.onrender.com/api/mpesa/stk',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            phone, 
+            amount, 
+            listingId, 
+            listingTitle 
+          })
         }
-      }
-      
-      return simulateMpesaPayment(phone, amount, listingId);
-    } catch (err) {
+      );
+      const data = await res.json();
+      console.log('M-Pesa live server response:', data);
+
+      const success = !!(data.success || data.ResponseCode === '0' || data.checkoutId || data.CheckoutRequestID);
+      const checkoutId = data.checkoutId || data.CheckoutRequestID || data.checkoutRequestID || `SIM-${Date.now()}`;
+
+      return {
+        success,
+        checkoutId,
+        message: data.message || data.ResponseDescription || 'STK Push sent! Check your phone.',
+        simulated: !data.CheckoutRequestID && !data.checkoutId && !data.checkoutRequestID
+      };
+    } catch (err: any) {
       console.error('STK Push error:', err);
       return simulateMpesaPayment(phone, amount, listingId);
     }
