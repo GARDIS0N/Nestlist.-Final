@@ -1558,9 +1558,232 @@ app.post("/api/payments/mpesa/simulate-success", async (req, res) => {
   }
 });
 
+// Proactive Safaricom STK Push status checking helper
+async function verifyAndSyncMpesaPayment(checkoutRequestID: string): Promise<any> {
+  if (!checkoutRequestID) {
+    return null;
+  }
+
+  const isMock = checkoutRequestID.includes("MOCK") || checkoutRequestID.includes("NLSTK");
+  if (isMock) {
+    const now = new Date().toISOString();
+    const receiptNumber = `NLRQ${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+
+    if (isSupabaseActive()) {
+      try {
+        const payments = await dbService.getPayments();
+        const payment = payments.find((p: any) => p.checkoutRequestID === checkoutRequestID);
+        if (payment && payment.status === "pending") {
+          const createdTime = new Date(payment.createdAt).getTime();
+          if (Date.now() - createdTime < 3000) {
+            return null;
+          }
+
+          await dbService.updatePayment(payment.id, {
+            status: "success",
+            mpesaReceiptNumber: receiptNumber,
+            transactionId: receiptNumber,
+            paymentTimestamp: now
+          });
+
+          const listings = await dbService.getListings();
+          const listing = listings.find((l: any) => l.id === payment.listingId);
+          if (listing) {
+            await dbService.updateListing(payment.listingId, {
+              status: "active",
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            });
+
+            await dbService.createNotification({
+              id: `not-${Date.now()}`,
+              userId: listing.author.id,
+              title: "Listing Published Live!",
+              message: `Your property listing "${listing.title}" has been successfully active and published live for 30 days!`,
+              isRead: false,
+              createdAt: now
+            });
+          }
+          return { status: "success", receipt: receiptNumber };
+        }
+      } catch (e) {
+        console.warn("Error in live Supabase STK mock payment sync:", e);
+      }
+    } else {
+      const db = loadDB();
+      const paymentIndex = db.payments.findIndex((p: any) => p.checkoutRequestID === checkoutRequestID);
+      if (paymentIndex !== -1 && db.payments[paymentIndex].status === "pending") {
+        const payment = db.payments[paymentIndex];
+        const createdTime = new Date(payment.createdAt).getTime();
+        if (Date.now() - createdTime < 3000) {
+          return null;
+        }
+
+        payment.status = "success";
+        payment.mpesaReceiptNumber = receiptNumber;
+        payment.transactionId = receiptNumber;
+        payment.paymentTimestamp = now;
+        payment.updatedAt = now;
+
+        const listingIndex = db.listings.findIndex((l: any) => l.id === payment.listingId);
+        if (listingIndex !== -1) {
+          db.listings[listingIndex].status = "active";
+          db.listings[listingIndex].expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+          
+          const ownerId = db.listings[listingIndex].author?.id;
+          if (ownerId) {
+            db.notifications.push({
+              id: `not-${Date.now()}`,
+              userId: ownerId,
+              title: "Listing Published Live!",
+              message: `Your property listing "${db.listings[listingIndex].title}" has been successfully active and published live for 30 days!`,
+              isRead: false,
+              createdAt: now
+            });
+          }
+        }
+        saveDB(db);
+        return { status: "success", receipt: receiptNumber };
+      }
+    }
+    return null;
+  }
+
+  try {
+    const accessToken = await getMpesaToken();
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
+    const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString("base64");
+
+    const baseUrl = (MPESA_ENV.toLowerCase() === "production" || MPESA_ENV.toLowerCase() === "live")
+      ? "https://api.safaricom.co.ke"
+      : "https://sandbox.safaricom.co.ke";
+    
+    const queryUrl = `${baseUrl}/mpesa/stkpushquery/v1/query`;
+
+    const queryBody = {
+      BusinessShortCode: MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestID
+    };
+
+    const res = await fetch(queryUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!res.ok) {
+      console.warn(`Safaricom query status returned non-OK state: ${res.status}`);
+      return null;
+    }
+
+    const data: any = await res.json();
+    console.log("🔍 SAFARICOM STK PUSH QUERY COMPUTE DETAIL:", JSON.stringify(data));
+
+    if (data.ResultCode === "0") {
+      const receiptNumber = data.MpesaReceiptNumber || `NLRQ${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+      const now = new Date().toISOString();
+
+      if (isSupabaseActive()) {
+        const payments = await dbService.getPayments();
+        const payment = payments.find((p: any) => p.checkoutRequestID === checkoutRequestID);
+        if (payment && payment.status === "pending") {
+          await dbService.updatePayment(payment.id, {
+            status: "success",
+            mpesaReceiptNumber: receiptNumber,
+            transactionId: receiptNumber,
+            paymentTimestamp: now
+          });
+
+          const listings = await dbService.getListings();
+          const listing = listings.find((l: any) => l.id === payment.listingId);
+          if (listing) {
+            await dbService.updateListing(payment.listingId, {
+              status: "active",
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            });
+
+            await dbService.createNotification({
+              id: `not-${Date.now()}`,
+              userId: listing.author.id,
+              title: "Listing Published Live!",
+              message: `Your property listing "${listing.title}" has been successfully active and published live for 30 days!`,
+              isRead: false,
+              createdAt: now
+            });
+          }
+          return { status: "success", receipt: receiptNumber };
+        }
+      } else {
+        const db = loadDB();
+        const paymentIndex = db.payments.findIndex((p: any) => p.checkoutRequestID === checkoutRequestID);
+        if (paymentIndex !== -1 && db.payments[paymentIndex].status === "pending") {
+          const payment = db.payments[paymentIndex];
+          payment.status = "success";
+          payment.mpesaReceiptNumber = receiptNumber;
+          payment.transactionId = receiptNumber;
+          payment.paymentTimestamp = now;
+          payment.updatedAt = now;
+
+          const listingIndex = db.listings.findIndex((l: any) => l.id === payment.listingId);
+          if (listingIndex !== -1) {
+            db.listings[listingIndex].status = "active";
+            db.listings[listingIndex].expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+            
+            const ownerId = db.listings[listingIndex].author?.id;
+            if (ownerId) {
+              db.notifications.push({
+                id: `not-${Date.now()}`,
+                userId: ownerId,
+                title: "Listing Published Live!",
+                message: `Your property listing "${db.listings[listingIndex].title}" has been successfully active and published live for 30 days!`,
+                isRead: false,
+                createdAt: now
+              });
+            }
+          }
+          saveDB(db);
+          return { status: "success", receipt: receiptNumber };
+        }
+      }
+    } else if (data.ResultCode && data.ResultCode !== "1032" && data.ResultCode !== "0") {
+      const now = new Date().toISOString();
+      if (isSupabaseActive()) {
+        const payments = await dbService.getPayments();
+        const payment = payments.find((p: any) => p.checkoutRequestID === checkoutRequestID);
+        if (payment && payment.status === "pending") {
+          await dbService.updatePayment(payment.id, {
+            status: "failed",
+            updatedAt: now
+          });
+          return { status: "failed" };
+        }
+      } else {
+        const db = loadDB();
+        const paymentIndex = db.payments.findIndex((p: any) => p.checkoutRequestID === checkoutRequestID);
+        if (paymentIndex !== -1 && db.payments[paymentIndex].status === "pending") {
+          db.payments[paymentIndex].status = "failed";
+          db.payments[paymentIndex].updatedAt = now;
+          saveDB(db);
+          return { status: "failed" };
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error("❌ Exception during Safaricom active status validation:", err.message);
+  }
+  return null;
+}
+
 // Dedicated Status Polling Route
 app.get("/api/payments/mpesa/status/:checkoutRequestID", async (req, res) => {
   const { checkoutRequestID } = req.params;
+
+  // Sync with Safaricom payment gateway
+  await verifyAndSyncMpesaPayment(checkoutRequestID);
 
   if (isSupabaseActive()) {
     try {

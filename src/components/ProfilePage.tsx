@@ -33,6 +33,7 @@ import {
 import { Profile, Listing, Inquiry, Notification, UserRole } from '../types';
 import { getApiUrl } from '../utils/apiHelper';
 import ListingCard from './ListingCard';
+import { toast } from '../utils/toast';
 
 interface ProfilePageProps {
   userProfile: Profile;
@@ -433,7 +434,7 @@ export default function ProfilePage({
       setTwoFactorEnabled(true);
       setShow2FAModal(false);
       update2FAMetrics(true);
-      alert('✓ Multi-factor authentication activated successfully! Backup recovery codes have been dispatched to your verified contact channels.');
+      toast.success('Multi-factor authentication activated successfully! Backup recovery codes have been dispatched to your verified contact channels.');
     }, 1500);
   };
 

@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { UserRole, Notification, Profile } from '../types';
+import { toast } from '../utils/toast';
 
 interface NavbarProps {
   currentRole: UserRole;
@@ -167,7 +168,7 @@ export default function Navbar({
             {/* Sign Up Free button in header */}
             <button
               onClick={() => {
-                alert("Welcome! You are currently exploring under our Elite Tour Profile. Signing up with Kenya Safekeeping is free and verified instantly with M-Pesa KYC.");
+                toast.info("Welcome! You are exploring on our Elite Tour Profile. Signing up with Kenya Safekeeping is free & verified instantly with M-Pesa KYC.");
               }}
               className="hidden lg:inline-flex px-4.5 py-1.5 rounded-full text-[11px] font-syne font-extrabold text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-violet-600/25 cursor-pointer"
             >
@@ -242,20 +243,20 @@ export default function Navbar({
               onClick={() => navigateTab('profile')}
               className="flex items-center gap-2 p-1 pl-1 pr-1 md:pr-3 rounded-full hover:bg-white/5 border border-white/10 transition-all cursor-pointer text-slate-305"
             >
-              {userProfile.avatarUrl ? (
+              {userProfile?.avatarUrl ? (
                 <img 
                   src={userProfile.avatarUrl} 
-                  alt={userProfile.fullName} 
+                  alt={userProfile.fullName || 'User'} 
                   className="w-7 h-7 rounded-full object-cover border border-[#08080F]"
                   referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white border border-[#08080F]">
-                  {userProfile.fullName ? userProfile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'NL'}
+                  {userProfile?.fullName ? userProfile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'NL'}
                 </div>
               )}
               <span className="hidden md:inline text-xs font-bold text-slate-300">
-                {userProfile.fullName.split(' ')[0]}
+                {userProfile?.fullName ? userProfile.fullName.split(' ')[0] : 'User'}
               </span>
             </button>
 
@@ -338,7 +339,7 @@ export default function Navbar({
                 </button>
                 <button
                   onClick={() => {
-                    alert("Welcome! You are currently exploring under our Elite Tour Profile. Signing up with Kenya Safekeeping is free and verified instantly with M-Pesa KYC.");
+                    toast.info("Welcome! You are exploring on our Elite Tour Profile. Signing up with Kenya Safekeeping is free & verified instantly with M-Pesa KYC.");
                     setMobileMenuOpen(false);
                   }}
                   className="w-full py-3 rounded-xl text-center text-[11px] font-syne font-black text-white bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 hover:brightness-110 active:scale-95 transition-all uppercase tracking-wider shadow-lg shadow-violet-605/20"

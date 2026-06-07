@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Listing, ViewingRequest, Inquiry, Profile } from '../types';
 import { getApiUrl } from '../utils/apiHelper';
+import { toast } from '../utils/toast';
 
 interface PropertyDetailProps {
   listing: Listing;
@@ -110,12 +111,12 @@ export default function PropertyDetail({
   const handleInquirySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!senderName || !senderPhone || !senderEmail || !inquiryMsg) {
-      alert("Please fill in all details for your inquiry.");
+      toast.error("Please fill in all details for your inquiry.");
       return;
     }
 
     if (inquiryMsg.length > 300) {
-      alert("Please shorten your message under 300 characters.");
+      toast.warning("Please shorten your message under 300 characters.");
       return;
     }
 
@@ -274,7 +275,7 @@ export default function PropertyDetail({
 
   const handleCallLandlord = () => {
     const landlordNumber = author.phone || '+254 712 345 678';
-    alert(`Dialing Landlord/Agent ${author.name} at ${landlordNumber}.\n\n🛡️ Kenya Safekeeping Escrow Protected Direct Call.`);
+    toast.info(`Simulating Call: Dialing ${author.name} at ${landlordNumber}... 🛡️ Kenya Escrow Protected.`);
   };
 
   // Maps amenity keywords to elegant Lucide icon components (Upgrade 6)

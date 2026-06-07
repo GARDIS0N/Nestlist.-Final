@@ -30,6 +30,7 @@ import { Listing, PropertyType, ListingImage, Currency, PaymentFrequency, UserRo
 import { KENYA_COUNTIES_CLEAN } from '../data/kenyaCounties';
 import { UploadErrorBoundary } from './UploadErrorBoundary';
 import { getListingFee } from '../utils/paymentAndNotify';
+import { toast } from '../utils/toast';
 
 export interface UploadTask {
   id: string;
@@ -400,7 +401,7 @@ export default function ListPropertyFlow({
     if (!selectedFiles) return;
     Array.from(selectedFiles).forEach((file, index) => {
       if (images.length >= 10) {
-        alert("Maximum Cap of 10 Photos has been reached.");
+        toast.warning("Maximum Cap of 10 Photos has been reached.");
         return;
       }
       const taskId = `task-${Date.now()}-${index}`;
@@ -434,7 +435,7 @@ export default function ListPropertyFlow({
 
   const handleAddPresetPhoto = () => {
     if (images.length >= 10) {
-      alert("A premium listing has a cap of 10 photos total.");
+      toast.warning("A premium listing has a cap of 10 photos total.");
       return;
     }
     const nextUnusedPreset = PRESET_IMAGES.find(url => !images.some(img => img.url === url)) || PRESET_IMAGES[0];
@@ -455,7 +456,7 @@ export default function ListPropertyFlow({
 
   const handleRemoveImage = (id: string) => {
     if (images.length <= 1) {
-      alert("Minimum requirement is 1 photo.");
+      toast.error("Minimum requirement is 1 photo.");
       return;
     }
     const filtered = images.filter(img => img.id !== id);

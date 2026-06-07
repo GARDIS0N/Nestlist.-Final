@@ -47,11 +47,49 @@ import Dashboards from './components/Dashboards';
 import PaymentSandboxVisualizer from './components/PaymentSandboxVisualizer';
 import Login from './components/Login';
 import ProfilePage from './components/ProfilePage';
+import ToastContainer from './components/ToastContainer';
+import { toast } from './utils/toast';
 
 import { checkExpiredListings } from './utils/paymentAndNotify';
 
 export default function App() {
   
+  // Install global UI alert overlay overrides to support high-fidelity iframe operation
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.alert = (message: any) => {
+        const msg = String(message);
+        if (
+          msg.toLowerCase().includes('error') || 
+          msg.toLowerCase().includes('failed') || 
+          msg.toLowerCase().includes('reject') || 
+          msg.toLowerCase().includes('invalid') ||
+          msg.toLowerCase().includes('cap') ||
+          msg.toLowerCase().includes('limit')
+        ) {
+          toast.error(msg);
+        } else if (
+          msg.toLowerCase().includes('success') || 
+          msg.toLowerCase().includes('active') || 
+          msg.toLowerCase().includes('approved') || 
+          msg.toLowerCase().includes('✓') || 
+          msg.toLowerCase().includes('complete')
+        ) {
+          toast.success(msg);
+        } else if (
+          msg.toLowerCase().includes('warning') || 
+          msg.toLowerCase().includes('required') || 
+          msg.toLowerCase().includes('caution') || 
+          msg.toLowerCase().includes('alert')
+        ) {
+          toast.warning(msg);
+        } else {
+          toast.info(msg);
+        }
+      };
+    }
+  }, []);
+
   // GENERAL ACCOUNT STATES (Fideli-sync)
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentRole, setCurrentRole] = useState<UserRole>('Tenant');
@@ -347,7 +385,7 @@ export default function App() {
           setUserProfile({
             id: u.id,
             userId: u.id,
-            username: u.email.split('@')[0],
+            username: (u.email || 'guest').split('@')[0],
             fullName: u.name,
             avatarUrl: u.avatarUrl || '',
             bio: u.bio || '',
@@ -755,7 +793,7 @@ export default function App() {
 
   const handleSaveCurrentFilters = () => {
     if (!newSavedSearchName.trim()) {
-      alert("Please provide a name/label for your saved search preferences.");
+      toast.warning("Please provide a name/label for your saved search preferences.");
       return;
     }
 
@@ -790,7 +828,7 @@ export default function App() {
     };
     setNotifications(prev => [successNot, ...prev]);
     
-    alert(`Search preference "${newSearch.name}" is now stored in your account! Manage alerts inside your Tenant Space.`);
+    toast.success(`Search preference "${newSearch.name}" is now stored in your account!`);
   };
 
   const handleDeleteSavedSearch = (id: string) => {
@@ -964,14 +1002,18 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <Login 
-        onLoginSuccess={handleLoginSuccess} 
-      />
+      <>
+        <Login 
+          onLoginSuccess={handleLoginSuccess} 
+        />
+        <ToastContainer />
+      </>
     );
   }
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col justify-between selection:bg-brand-blue selection:text-white">
+      <ToastContainer />
       
       {/* GLOBAL NAVBAR BANNER ELEMENT */}
       <Navbar 

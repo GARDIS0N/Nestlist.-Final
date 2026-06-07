@@ -891,9 +891,10 @@ export default function Dashboards({
                         </div>
                       ) : (
                         transactions.slice(0, 5).map((tx, idx) => {
-                          const associatedListing = listings.find(l => tx.description.toLowerCase().includes(l.title.toLowerCase())) || listings[idx % listings.length];
+                          const desc = tx.description || 'Property Listing Payment';
+                          const associatedListing = listings.find(l => desc.toLowerCase().includes((l.title || '').toLowerCase())) || listings[idx % listings.length];
                           const username = associatedListing?.author?.name || (userAccounts[idx % userAccounts.length]?.name) || 'Mwangi Peter';
-                          const listingTitle = associatedListing?.title || tx.description.split('-')[0].trim() || 'Premium Boost Fee';
+                          const listingTitle = associatedListing?.title || desc.split('-')[0].trim() || 'Premium Boost Fee';
                           const displayDate = new Date(tx.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' });
 
                           return (
@@ -1940,8 +1941,8 @@ export default function Dashboards({
         const expiringCount = expiringListings.length;
 
         // Custom gradient generator per sender
-        const getGradientBySender = (name: string) => {
-          const charSum = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const getGradientBySender = (name: string = '') => {
+          const charSum = (name || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
           const gradients = [
             'from-indigo-500 to-purple-500 shadow-indigo-500/20',
             'from-emerald-500 to-teal-500 shadow-emerald-500/20',

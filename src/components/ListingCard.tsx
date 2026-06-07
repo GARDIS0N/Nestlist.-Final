@@ -19,6 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Listing } from '../types';
+import { toast } from '../utils/toast';
 
 interface ListingCardProps {
   listing: Listing;
@@ -91,7 +92,7 @@ export default function ListingCard({
       : `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
       
     navigator.clipboard.writeText(`${text} ${url}`);
-    alert(`Copied Link for WhatsApp sharing:\n"${title}" (${formattedPrice()})`);
+    toast.success(`Copied Link for sharing: "${title}" (${formattedPrice()})`);
   };
 
   const triggerFavoriteWithPulse = (e: React.MouseEvent) => {
