@@ -1564,7 +1564,7 @@ async function verifyAndSyncMpesaPayment(checkoutRequestID: string): Promise<any
     return null;
   }
 
-  const isMock = checkoutRequestID.includes("MOCK") || checkoutRequestID.includes("NLSTK");
+  const isMock = checkoutRequestID.includes("MOCK") || checkoutRequestID.includes("NLSTK") || checkoutRequestID.includes("SIM");
   if (isMock) {
     const now = new Date().toISOString();
     const receiptNumber = `NLRQ${crypto.randomBytes(4).toString("hex").toUpperCase()}`;

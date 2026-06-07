@@ -195,20 +195,58 @@ export default function Dashboards({
   const [stkReference, setStkReference] = useState('');
   const [activePaymentTab, setActivePaymentTab] = useState<'mpesa' | 'airtel' | 'card' | 'stripe'>('mpesa');
 
-  // Automatic circular countdown timer
+  // Decoupled countdown timer effect for Dashboard Modal
   useEffect(() => {
-    let timerId: any;
-    if (paymentModalStep === 'stk_sent' && stkCountdown > 0) {
-      timerId = setInterval(() => {
-        setStkCountdown(c => c - 1);
-      }, 1000);
+    if (paymentModalStep !== 'stk_sent') return;
+    if (stkCountdown <= 0) {
+      setCheckoutFeedback({
+        text: `⏳ STK verification session timed out. Please try again.`,
+        type: 'refused'
+      });
+      if (activePaymentRecord) {
+        setActivePaymentRecord((prev: any) => prev ? { ...prev, status: 'failed' } : null);
+      }
+      return;
     }
-    return () => clearInterval(timerId);
+
+    const timer = setTimeout(() => {
+      setStkCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, [paymentModalStep, stkCountdown]);
 
   // Sync payments and active listings against in-memory backend
   const syncPaymentEngine = async () => {
     try {
+      // If we have an active STK push pending in Dashboard, proactively poll status route!
+      if (paymentModalStep === 'stk_sent' && stkReference) {
+        try {
+          const statusRes = await fetch(getApiUrl(`/api/payments/mpesa/status/${stkReference}`));
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData && statusData.success) {
+              if (statusData.status === 'success') {
+                setPaymentModalStep('success');
+                onRefreshListings?.();
+                return;
+              } else if (statusData.status === 'failed') {
+                setCheckoutFeedback({
+                  text: `❌ Transaction was declined or timed out. Please try again.`,
+                  type: 'refused'
+                });
+                if (activePaymentRecord) {
+                  setActivePaymentRecord((prev: any) => prev ? { ...prev, status: 'failed' } : null);
+                }
+                return;
+              }
+            }
+          }
+        } catch (statusErr) {
+          console.warn("Error polling specific STK status:", statusErr);
+        }
+      }
+
       const res = await fetch(getApiUrl('/api/payments'));
       if (res.ok) {
         const data = await res.json();
@@ -221,8 +259,9 @@ export default function Dashboards({
             if (current) {
               setActivePaymentRecord(current);
               if (current.status === 'success') {
+                setPaymentModalStep('success');
                 setCheckoutFeedback({
-                  text: `🔥 Payment approved! Transaction settled. Status has transitioned to SUCCESS and listing was successfully activated on the live server.`,
+                  text: `🔥 Payment approved! Transaction settled. Status has transitioned to SUCCESS.`,
                   type: 'success'
                 });
               } else if (current.status === 'failed') {
@@ -245,9 +284,9 @@ export default function Dashboards({
     syncPaymentEngine();
     const interval = setInterval(() => {
       syncPaymentEngine();
-    }, 3000);
+    }, 3500);
     return () => clearInterval(interval);
-  }, [activePaymentRecord]);
+  }, [activePaymentRecord, paymentModalStep, stkReference]);
 
   // Handle payment processing success completely (client-side dynamic synch)
   const handlePaymentSuccessCheckout = async (listingId: string, method: string, reference: string, amountPaid: number) => {
@@ -3229,8 +3268,8 @@ export default function Dashboards({
                     <div className="py-2">
                       <span className="inline-block relative">
                         <span className="flex h-3 w-3 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                          <span className={`${stkCountdown < 10 ? 'bg-red-400' : 'bg-emerald-400'} animate-ping absolute inline-flex h-full w-full rounded-full opacity-75`}></span>
+                          <span className={`relative inline-flex rounded-full h-3 w-3 ${stkCountdown < 10 ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
                         </span>
                       </span>
                       <p className="text-xs font-semibold text-slate-800 mt-2">STK Push sent to {mpesaPhone}!</p>
@@ -3238,20 +3277,27 @@ export default function Dashboards({
                       <p className="text-[10px] text-slate-400 font-mono mt-2">Ref ID: {stkReference}</p>
                     </div>
 
-                    {/* Show Realtime status */}
-                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                      <span className="text-[10px] text-slate-400 uppercase font-mono font-bold block">Transaction Webhook Realtime Status</span>
-                      <div className="flex items-center justify-center gap-2 mt-1.5">
-                        <span className="text-xs font-bold capitalize text-slate-800">
-                          {activePaymentRecord?.status === 'pending' ? '⏳ Pending callback...' : activePaymentRecord?.status === 'success' ? '✅ SUCCESS - Asset Activated' : activePaymentRecord?.status === 'failed' ? '❌ FAILED - Transaction Declined' : '⏳ Processing Callback...'}
-                        </span>
+                    {/* Highly Visible Countdown Timer */}
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center">
+                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">STK Verification Timeout</span>
+                      <div className={`text-2xl font-mono font-black mt-1 ${stkCountdown < 10 ? 'text-red-500 animate-pulse scale-105' : 'text-emerald-600'} transition-all duration-300`}>
+                        00:{stkCountdown < 10 ? `0${stkCountdown}` : stkCountdown}
                       </div>
-                      <p className="text-[10px] text-slate-500 mt-1">Status will auto-transition immediately safe credentials are verified.</p>
                     </div>
 
-                    {/* Developer Mock Webhook trigger for Sandbox */}
-                    <div className="border-t border-slate-200 pt-4 mt-2">
-                      <p className="text-[10px] text-slate-400 mb-2">Simulate a Safaricom Callback response for testing validation rules instantly:</p>
+                    {/* Show Realtime status */}
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <span className="text-[10px] text-slate-400 uppercase font-mono font-bold block">Transaction Webhook Status</span>
+                      <div className="flex items-center justify-center gap-2 mt-1.5">
+                        <span className="text-xs font-bold capitalize text-slate-800">
+                          {activePaymentRecord?.status === 'pending' ? '⏳ Pending callback...' : activePaymentRecord?.status === 'success' ? '✅ SUCCESS - Asset Activated' : activePaymentRecord?.status === 'failed' ? '❌ FAILED/TIMED OUT' : '⏳ Status Polling...'}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1">Status will auto-transition immediately safe credentials are verified.</p>
+                    </div>
+
+                    {/* Actions Grid */}
+                    <div className="pt-2 flex flex-col gap-2">
                       <button
                         type="button"
                         onClick={async () => {
@@ -3269,10 +3315,36 @@ export default function Dashboards({
                             console.error(e);
                           }
                         }}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 py-2 px-3 rounded-lg text-xs font-semibold w-full transition-colors"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs w-full transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                       >
-                        ⚡ Simulate Sandbox Callback Success
+                        ✅ I Have Paid - Activate Listing
                       </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStkCountdown(60);
+                            handleMpesaSTKPushTrigger(payingListing.id, getListingFee(payingListing.propertyType, payingListing.details?.bedrooms || 0));
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 py-1.5 px-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          🔄 Resend STK
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedListingForPayment('');
+                            setActivePaymentRecord(null);
+                            setCheckoutFeedback(null);
+                            setPaymentModalStep('checkout');
+                          }}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 py-1.5 px-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          ❌ Cancel Verification
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

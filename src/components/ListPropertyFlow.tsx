@@ -831,25 +831,25 @@ export default function ListPropertyFlow({
     }
   };
 
+  // DECOUPLED COUNTDOWN TIMER EFFECT
+  useEffect(() => {
+    if (paymentStepStatus !== 'processing') return;
+    if (countdown <= 0) {
+      setPaymentStepStatus('failed');
+      setPaymentErrorMessage("STK verification session timed out. Please try again.");
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [paymentStepStatus, countdown]);
+
   // PAYMENT STATUS CHECK POLLING OF SERVER
   useEffect(() => {
     if (paymentStepStatus !== 'processing' || !checkoutId) return;
-
-    let timerId: any;
-    let countdownId: any;
-
-    countdownId = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownId);
-          clearInterval(timerId);
-          setPaymentStepStatus('failed');
-          setPaymentErrorMessage("STK verification session timed out. Please try again.");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
 
     const checkPaymentStatus = async () => {
       try {
@@ -857,16 +857,12 @@ export default function ListPropertyFlow({
         const data = await res.json();
         if (data && data.success) {
           if (data.status === 'success') {
-            clearInterval(countdownId);
-            clearInterval(timerId);
             setReceiptNumber(data.mpesaReceiptNumber || 'NLRX90B345');
             setPaymentStepStatus('success');
             if (createdListingData) {
               setCreatedListingData(prev => prev ? { ...prev, status: 'active' } : null);
             }
           } else if (data.status === 'failed') {
-            clearInterval(countdownId);
-            clearInterval(timerId);
             setPaymentStepStatus('failed');
             setPaymentErrorMessage("M-Pesa transaction was canceled or rejected on the device.");
           }
@@ -877,11 +873,10 @@ export default function ListPropertyFlow({
     };
 
     checkPaymentStatus();
-    timerId = setInterval(checkPaymentStatus, 4500);
+    const intervalId = setInterval(checkPaymentStatus, 4500);
 
     return () => {
-      clearInterval(timerId);
-      clearInterval(countdownId);
+      clearInterval(intervalId);
     };
   }, [paymentStepStatus, checkoutId]);
 
