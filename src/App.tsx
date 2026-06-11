@@ -24,6 +24,7 @@ import { useAuth } from "./AuthContext";
 import { PropertyDetailModal } from "./components/PropertyDetailModal";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ChatInsideInquiry } from "./components/ChatInsideInquiry";
+import ListPropertyModal from "./components/ListPropertyModal";
 
 // ─── API & SUPABASE CONFIG ───────────────────────────────────────────────────
 // Prefer Vite environment variables, falling back to Render endpoints and placeholders
@@ -1182,7 +1183,7 @@ export default function App({ defaultView }: { defaultView?: "browse" | "dashboa
 
       {/* B. LIST NEW PROPERTY WORKFLOW MODAL (MULTISTEP WITH ACTUAL M-PESA STK) */}
       {showAddNewProperty && (
-        <ListPropertyFlowWrapper 
+        <ListPropertyModal 
           onClose={() => setShowAddNewProperty(false)} 
           onSubmit={handleAddProperty}
           showToast={showToast}
