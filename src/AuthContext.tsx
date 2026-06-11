@@ -392,30 +392,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Sandbox Mock Auth SignUp
     const db = getMockProfilesDb();
-    const exists = db?.some((u: any) => u.email.toLowerCase() === emailLower);
+    const existingIndex = db?.findIndex((u: any) => u.email.toLowerCase() === emailLower);
 
-    if (exists) {
-      setLoading(false);
-      return { user: null, profile: null, error: new Error("An account with this email address already exists in the sandbox database.") };
+    let finalProfile: any;
+
+    if (existingIndex !== -1 && existingIndex !== undefined) {
+      // Update existing sandbox account
+      finalProfile = {
+        ...db[existingIndex],
+        password: password,
+        full_name: fullName,
+        phone: phone || null,
+        role: role
+      };
+      db[existingIndex] = finalProfile;
+      localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(db));
+    } else {
+      // Create new sandbox account
+      const newId = `usr-mock-${Date.now()}`;
+      finalProfile = {
+        id: newId,
+        email: emailLower,
+        password: password,
+        full_name: fullName,
+        phone: phone || null,
+        role: role,
+        created_at: new Date().toISOString()
+      };
+      db.push(finalProfile);
+      localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(db));
     }
 
-    const newId = `usr-mock-${Date.now()}`;
-    const newMockProfile = {
-      id: newId,
-      email: emailLower,
-      password: password,
-      full_name: fullName,
-      phone: phone || null,
-      role: role,
-      created_at: new Date().toISOString()
-    };
+    const mockUser = {
+      id: finalProfile.id,
+      email: finalProfile.email,
+      user_metadata: {},
+      app_metadata: {},
+      aud: 'authenticated',
+      created_at: finalProfile.created_at,
+    } as any;
 
-    saveMockProfileToDb(newMockProfile);
+    const mockSession = {
+      access_token: "mock-token-session",
+      token_type: "bearer",
+      expires_in: 3600,
+      refresh_token: "mock-refresh-token-session",
+      user: mockUser,
+    } as any;
+
+    localStorage.setItem("nestlist_mock_session", JSON.stringify(mockSession));
+    setSession(mockSession);
+    setUser(mockUser);
+    setProfile({
+      id: finalProfile.id,
+      full_name: finalProfile.full_name,
+      phone: finalProfile.phone,
+      role: finalProfile.role,
+      created_at: finalProfile.created_at
+    });
     activateMockMode();
     setLoading(false);
     return { 
-      user: { id: newId, email: emailLower } as any, 
-      profile: { id: newId, full_name: fullName, phone: phone || null, role, created_at: newMockProfile.created_at }, 
+      user: mockUser, 
+      profile: { id: finalProfile.id, full_name: finalProfile.full_name, phone: finalProfile.phone, role: finalProfile.role, created_at: finalProfile.created_at }, 
       error: null 
     };
   };
