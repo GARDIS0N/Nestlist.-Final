@@ -11,7 +11,7 @@ create table profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   full_name text not null,
   phone text,
-  role text check (role in ('landlord', 'tenant')) not null,
+  role text check (role in ('landlord', 'tenant', 'admin')) not null,
   avatar_url text,
   created_at timestamptz default now()
 );
