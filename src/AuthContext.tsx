@@ -74,7 +74,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [isMockMode, setIsMockMode] = useState<boolean>(!isSupabaseConfigured);
+  const [isMockMode, setIsMockMode] = useState<boolean>(() => {
+    if (!isSupabaseConfigured) return true;
+    return localStorage.getItem("nestlist_offline_mode") === "true";
+  });
+
+  const activateMockMode = () => {
+    setIsMockMode(true);
+    localStorage.setItem("nestlist_offline_mode", "true");
+  };
 
   // Load mock profiles DB
   const getMockProfilesDb = () => {
@@ -136,9 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setLoading(true);
 
-        if (!isSupabaseConfigured) {
-          console.log("ℹ️ Supabase credentials not found in env. Initialized in Sandbox Auth Mode.");
-          setIsMockMode(true);
+        if (!isSupabaseConfigured || isMockMode) {
+          console.log("ℹ️ Initialized in Sandbox Auth Mode.");
           const cachedSession = localStorage.getItem("nestlist_mock_session");
           if (cachedSession) {
             const parsed = JSON.parse(cachedSession);
@@ -171,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser(parsed.user);
               const prof = await fetchProfile(parsed.user.id);
               setProfile(prof);
-              setIsMockMode(true);
+              activateMockMode();
             } else {
               setSession(null);
               setUser(null);
@@ -181,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (authError: any) {
           console.warn("Supabase getSession failed, falling back to Sandbox Auth:", authError.message);
-          setIsMockMode(true);
+          activateMockMode();
           const cachedSession = localStorage.getItem("nestlist_mock_session");
           if (cachedSession) {
             const parsed = JSON.parse(cachedSession);
@@ -243,7 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If the error looks like a "Failed to fetch", fall back to mock auth
           if (error.message.toLowerCase().includes("failed to fetch") || error.message.toLowerCase().includes("fetch failed")) {
             console.warn("Supabase host offline. Activating Sandbox Auth fallback.");
-            setIsMockMode(true);
+            activateMockMode();
           } else {
             setLoading(false);
             return { user: null, profile: null, error };
@@ -259,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err: any) {
         if (err.message?.toLowerCase().includes("failed to fetch") || err.message?.toLowerCase().includes("fetch failed")) {
           console.warn("Supabase host offline during signin. Activating Sandbox Auth Mode.");
-          setIsMockMode(true);
+          activateMockMode();
         } else {
           setLoading(false);
           return { user: null, profile: null, error: err };
@@ -269,47 +276,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Sandbox Mock Auth (either forced or fallback)
     const db = getMockProfilesDb();
-    const mockUserAccount = db.find((u: any) => u.email.toLowerCase() === emailLower && u.password === password);
+    let mockUserAccount = db.find((u: any) => u.email.toLowerCase() === emailLower);
 
     if (mockUserAccount) {
-      const mockUser = {
-        id: mockUserAccount.id,
-        email: mockUserAccount.email,
-        user_metadata: {},
-        app_metadata: {},
-        aud: 'authenticated',
-        created_at: mockUserAccount.created_at,
-      } as any;
-
-      const mockSession = {
-        access_token: "mock-token-session",
-        token_type: "bearer",
-        expires_in: 3600,
-        refresh_token: "mock-refresh-token-session",
-        user: mockUser,
-      } as any;
-
-      localStorage.setItem("nestlist_mock_session", JSON.stringify(mockSession));
-      setSession(mockSession);
-      setUser(mockUser);
-      setProfile({
-        id: mockUserAccount.id,
-        full_name: mockUserAccount.full_name,
-        phone: mockUserAccount.phone,
-        role: mockUserAccount.role,
-        created_at: mockUserAccount.created_at
-      });
-      setIsMockMode(true);
-      setLoading(false);
-      return { user: mockUser, profile: mockUserAccount, error: null };
+      if (mockUserAccount.password !== password) {
+        setLoading(false);
+        return { 
+          user: null, 
+          profile: null, 
+          error: new Error("Incorrect password for this sandbox account. Please verify your credentials or register a new one.") 
+        };
+      }
     } else {
-      setLoading(false);
-      return { 
-        user: null, 
-        profile: null, 
-        error: new Error("Invalid credentials (using Local offline Database fallback). Correct details or register an account.") 
+      // Auto-create a brand new sandbox account on the fly for any new logins in mock mode!
+      const newId = `usr-mock-${Date.now()}`;
+      mockUserAccount = {
+        id: newId,
+        email: emailLower,
+        password: password,
+        full_name: emailLower.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        phone: "+254712345678",
+        role: emailLower.includes('landlord') ? ('landlord' as const) : (emailLower.includes('admin') ? ('admin' as const) : ('tenant' as const)),
+        created_at: new Date().toISOString()
       };
+      saveMockProfileToDb(mockUserAccount);
     }
+
+    const mockUser = {
+      id: mockUserAccount.id,
+      email: mockUserAccount.email,
+      user_metadata: {},
+      app_metadata: {},
+      aud: 'authenticated',
+      created_at: mockUserAccount.created_at,
+    } as any;
+
+    const mockSession = {
+      access_token: "mock-token-session",
+      token_type: "bearer",
+      expires_in: 3600,
+      refresh_token: "mock-refresh-token-session",
+      user: mockUser,
+    } as any;
+
+    localStorage.setItem("nestlist_mock_session", JSON.stringify(mockSession));
+    setSession(mockSession);
+    setUser(mockUser);
+    setProfile({
+      id: mockUserAccount.id,
+      full_name: mockUserAccount.full_name,
+      phone: mockUserAccount.phone,
+      role: mockUserAccount.role,
+      created_at: mockUserAccount.created_at
+    });
+    activateMockMode();
+    setLoading(false);
+    return { user: mockUser, profile: mockUserAccount, error: null };
   };
 
   const signUp = async (
@@ -333,7 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) {
           if (error.message.toLowerCase().includes("failed to fetch") || error.message.toLowerCase().includes("fetch failed")) {
             console.warn("Supabase host offline during register. Redirecting to Sandbox Auth.");
-            setIsMockMode(true);
+            activateMockMode();
           } else {
             setLoading(false);
             return { user: null, profile: null, error };
@@ -360,7 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err: any) {
         if (err.message?.toLowerCase().includes("failed to fetch") || err.message?.toLowerCase().includes("fetch failed")) {
           console.warn("Supabase host offline during register. Activating Sandbox Auth.");
-          setIsMockMode(true);
+          activateMockMode();
         } else {
           setLoading(false);
           return { user: null, profile: null, error: err };
@@ -389,7 +411,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     saveMockProfileToDb(newMockProfile);
-    setIsMockMode(true);
+    activateMockMode();
     setLoading(false);
     return { 
       user: { id: newId, email: emailLower } as any, 
@@ -402,6 +424,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       localStorage.removeItem("nestlist_mock_session");
+      localStorage.removeItem("nestlist_offline_mode");
+      setIsMockMode(!isSupabaseConfigured);
       if (isSupabaseConfigured && !isMockMode) {
         try {
           await supabase.auth.signOut();
