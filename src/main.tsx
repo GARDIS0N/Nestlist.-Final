@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ClerkProvider } from '@clerk/clerk-react';
+import { ClerkProvider, AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ProtectedRoute } from './ProtectedRoute';
 import { Login } from './Login';
@@ -67,6 +67,7 @@ createRoot(document.getElementById('root')!).render(
             {/* Public Auth Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
 
             {/* Protected Application Routes */}
             <Route 

@@ -186,7 +186,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.post("/api/set-role", async (req, res) => {
-  const { userId, role } = req.body;
+  const { userId, role, phone } = req.body;
   if (!userId || !role) {
     return res.status(400).json({ success: false, error: "Missing userId or role parameters" });
   }
@@ -201,10 +201,13 @@ app.post("/api/set-role", async (req, res) => {
     const { createClerkClient } = await import("@clerk/backend");
     const clerk = createClerkClient({ secretKey });
     await clerk.users.updateUserMetadata(userId, {
-      publicMetadata: { role }
+      publicMetadata: {
+        role,
+        ...(phone ? { phone } : {})
+      }
     });
-    console.log(`✅ Assigned role '${role}' to Clerk user: ${userId}`);
-    return res.json({ success: true, message: "Clerk user publicMetadata role configuration updated successfully" });
+    console.log(`✅ Assigned role '${role}' and phone '${phone || ""}' to Clerk user: ${userId}`);
+    return res.json({ success: true, message: "Clerk user publicMetadata configuration updated successfully" });
   } catch (error: any) {
     console.error("❌ Clerk role update exception:", error);
     return res.status(500).json({ success: false, error: error.message || "Setting Clerk metadata failed" });

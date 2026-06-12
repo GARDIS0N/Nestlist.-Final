@@ -49,6 +49,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [isUserLoaded, isSignInLoaded, isSignUpLoaded]);
 
+  // Sync pending OAuth user metadata (role and phone) received during Google OAuth redirection
+  useEffect(() => {
+    const syncOauthMetadata = async () => {
+      if (clerkUser) {
+        const currentRole = clerkUser.publicMetadata?.role;
+        const currentPhone = clerkUser.publicMetadata?.phone;
+        const pendingRole = localStorage.getItem("nestlist_oauth_pending_role");
+        const pendingPhone = localStorage.getItem("nestlist_oauth_pending_phone");
+
+        if (!currentRole && (pendingRole || pendingPhone)) {
+          try {
+            console.log("Syncing pending OAuth role and phone to Clerk publicMetadata:", { pendingRole, pendingPhone });
+            const response = await fetch("/api/set-role", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                userId: clerkUser.id,
+                role: pendingRole || "tenant",
+                phone: pendingPhone || ""
+              }),
+            });
+            const data = await response.json();
+            if (data.success) {
+              await clerkUser.reload();
+              localStorage.removeItem("nestlist_oauth_pending_role");
+              localStorage.removeItem("nestlist_oauth_pending_phone");
+            }
+          } catch (err) {
+            console.error("Failed to sync pending OAuth metadata:", err);
+          }
+        }
+      }
+    };
+
+    if (isUserLoaded && clerkUser) {
+      syncOauthMetadata();
+    }
+  }, [clerkUser, isUserLoaded]);
+
   // Derive user object matching key parameters expected by standard application viewports
   const user = clerkUser
     ? {
@@ -64,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ? {
         id: clerkUser.id,
         full_name: clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress.split("@")[0] || "Guest",
-        phone: clerkUser.primaryPhoneNumber?.phoneNumber || pendingSignup?.phone || null,
+        phone: clerkUser.primaryPhoneNumber?.phoneNumber || (clerkUser.publicMetadata?.phone as string) || pendingSignup?.phone || null,
         role: (clerkUser.publicMetadata?.role as "landlord" | "tenant" | "admin") || "tenant",
         created_at: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : new Date().toISOString(),
         email: clerkUser.primaryEmailAddress?.emailAddress || "",

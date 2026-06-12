@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useSignUp } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserPlus, 
@@ -259,6 +260,7 @@ const privacySections: DocSection[] = [
 export const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, submitOTP, signUpStep, resendVerificationOTP } = useAuth();
+  const { isLoaded: isClerkSignUpLoaded, signUp: clerkSignUp } = useSignUp();
 
   // Primary variables
   const [fullName, setFullName] = useState('');
@@ -419,19 +421,36 @@ export const SignUp: React.FC = () => {
     }
   };
 
-  // Mock Social Sign-Up
-  const handleSocialSignUp = (provider: string) => {
-    triggerToast(`Establishing secure Oauth connection for registration with ${provider}...`, 'info');
-    setTimeout(() => {
-      setFullName(`${provider} User`);
-      setEmail(`${provider.toLowerCase()}_user@nestlist.ke`);
-      setPhone('254712345678');
-      setPassword('Premium@123');
-      setConfirmPassword('Premium@123');
-      setAcceptedTerms(true);
-      setAcceptedPrivacy(true);
-      triggerToast(`${provider} details pre-filled. Complete registration setup!`, 'success');
-    }, 1200);
+  // Real Social Sign-Up via Google Clerk Flow
+  const handleSocialSignUp = async (provider: string) => {
+    if (provider.toLowerCase() === 'google') {
+      try {
+        setAuthLoading(true);
+        if (!isClerkSignUpLoaded || !clerkSignUp) {
+          throw new Error("Secure sign-up module is loading. Please reload or retry in a moment.");
+        }
+
+        // Store target metadata configurations in local state before transferring to callback redirect
+        localStorage.setItem("nestlist_oauth_pending_role", selectedRole);
+        if (phone.trim()) {
+          localStorage.setItem("nestlist_oauth_pending_phone", phone);
+        }
+
+        await clerkSignUp.authenticateWithRedirect({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: "/"
+        });
+      } catch (err: any) {
+        console.error("Clerk Google Sign-Up redirect exception:", err);
+        setErrorMessage(err.message || "Failed to initialize Google OAuth registration sequence.");
+        triggerToast("Google Sign-Up failed to redirect", "error");
+      } finally {
+        setAuthLoading(false);
+      }
+    } else {
+      triggerToast(`${provider} social authentication is only supported through Google integration currently.`, 'info');
+    }
   };
 
   // Determine strength meter color
