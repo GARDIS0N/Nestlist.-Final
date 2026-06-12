@@ -185,6 +185,32 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", mode: "full-stack-secure-database", time: new Date() });
 });
 
+app.post("/api/set-role", async (req, res) => {
+  const { userId, role } = req.body;
+  if (!userId || !role) {
+    return res.status(400).json({ success: false, error: "Missing userId or role parameters" });
+  }
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey) {
+    console.error("❌ CLERK_SECRET_KEY is missing from server environment");
+    return res.status(500).json({ success: false, error: "Clerk Secret Key is not configured on the server." });
+  }
+
+  try {
+    const { createClerkClient } = await import("@clerk/backend");
+    const clerk = createClerkClient({ secretKey });
+    await clerk.users.updateUserMetadata(userId, {
+      publicMetadata: { role }
+    });
+    console.log(`✅ Assigned role '${role}' to Clerk user: ${userId}`);
+    return res.json({ success: true, message: "Clerk user publicMetadata role configuration updated successfully" });
+  } catch (error: any) {
+    console.error("❌ Clerk role update exception:", error);
+    return res.status(500).json({ success: false, error: error.message || "Setting Clerk metadata failed" });
+  }
+});
+
 // User Registration Router
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, name, role, phone } = req.body;

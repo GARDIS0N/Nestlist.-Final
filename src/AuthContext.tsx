@@ -1,337 +1,106 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from './lib/supabaseClient';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUser, useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 
 export interface Profile {
   id: string;
   full_name: string;
   phone: string | null;
-  role: 'landlord' | 'tenant' | 'admin';
+  role: "landlord" | "tenant" | "admin";
   created_at: string;
   email?: string;
 }
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  user: any | null;
   profile: Profile | null;
   loading: boolean;
   isMockMode: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ user: User | null; profile: Profile | null; error: any }>;
+  signIn: (email: string, password: string) => Promise<{ user: any | null; profile: Profile | null; error: any }>;
   signUp: (
     email: string,
     password: string,
     fullName: string,
     phone: string,
-    role: 'landlord' | 'tenant' | 'admin'
-  ) => Promise<{ user: User | null; profile: Profile | null; error: any }>;
+    role: "landlord" | "tenant" | "admin"
+  ) => Promise<{ user: any | null; profile: Profile | null; error: any }>;
+  submitOTP: (code: string) => Promise<{ success: boolean }>;
+  signUpStep: "idle" | "verifying" | "completed";
+  resendVerificationOTP: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const isSupabaseConfigured = Boolean(
-  (import.meta as any).env.VITE_SUPABASE_URL && 
-  (import.meta as any).env.VITE_SUPABASE_ANON_KEY && 
-  (import.meta as any).env.VITE_SUPABASE_URL !== "https://your-project.supabase.co" &&
-  (import.meta as any).env.VITE_SUPABASE_ANON_KEY !== "your-anon-key"
-);
-
-// Default mock profiles database
-const DEFAULT_MOCK_PROFILES_DB = [
-  {
-    id: "landlord-1",
-    email: "landlord@nestlist.ke",
-    password: "password",
-    full_name: "Francis Ngari",
-    phone: "254712345678",
-    role: "landlord" as const,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "tenant-1",
-    email: "tenant@nestlist.ke",
-    password: "password",
-    full_name: "Alice Achieng",
-    phone: "254799887766",
-    role: "tenant" as const,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: "admin-1",
-    email: "admin@nestlist.ke",
-    password: "password",
-    full_name: "SaaS Admin",
-    phone: "254700000000",
-    role: "admin" as const,
-    created_at: new Date().toISOString()
-  }
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { isLoaded: isUserLoaded, user: clerkUser } = useUser();
+  const { isLoaded: isSignInLoaded, signIn: clerkSignIn } = useSignIn();
+  const { isLoaded: isSignUpLoaded, signUp: clerkSignUp, setActive } = useSignUp();
+  const { signOut: clerkSignOut } = useClerk();
+
   const [loading, setLoading] = useState<boolean>(true);
-  const [isMockMode, setIsMockMode] = useState<boolean>(() => {
-    if (!isSupabaseConfigured) return true;
-    return localStorage.getItem("nestlist_offline_mode") === "true";
-  });
+  const [signUpStep, setSignUpStep] = useState<"idle" | "verifying" | "completed">("idle");
+  const [pendingSignup, setPendingSignup] = useState<{ role: string; phone: string } | null>(null);
 
-  const activateMockMode = () => {
-    setIsMockMode(true);
-    localStorage.setItem("nestlist_offline_mode", "true");
-  };
+  // Sync loading state with Clerk loaded statuses
+  useEffect(() => {
+    if (isUserLoaded && isSignInLoaded && isSignUpLoaded) {
+      setLoading(false);
+    }
+  }, [isUserLoaded, isSignInLoaded, isSignUpLoaded]);
 
-  // Load mock profiles DB
-  const getMockProfilesDb = () => {
-    const cached = localStorage.getItem("nestlist_mock_profiles_db");
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {
-        return DEFAULT_MOCK_PROFILES_DB;
+  // Derive user object matching key parameters expected by standard application viewports
+  const user = clerkUser
+    ? {
+        ...clerkUser,
+        id: clerkUser.id,
+        email: clerkUser.primaryEmailAddress?.emailAddress || "",
+        email_confirmed_at: clerkUser.primaryEmailAddress?.verification.status === "verified" ? new Date().toISOString() : null,
       }
-    }
-    localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(DEFAULT_MOCK_PROFILES_DB));
-    return DEFAULT_MOCK_PROFILES_DB;
-  };
+    : null;
 
-  const saveMockProfileToDb = (newProfile: any) => {
-    const db = getMockProfilesDb();
-    db.push(newProfile);
-    localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(db));
-  };
-
-  // Fetch user profile from database
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
-    if (isMockMode) {
-      const db = getMockProfilesDb();
-      const p = db.find((item: any) => item.id === userId);
-      return p ? { id: p.id, full_name: p.full_name, phone: p.phone, role: p.role, created_at: p.created_at } : null;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error.message);
-        return null;
+  // Derive premium name and authorization role properties from fullName and publicMetadata.role attributes
+  const profile: Profile | null = clerkUser
+    ? {
+        id: clerkUser.id,
+        full_name: clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress.split("@")[0] || "Guest",
+        phone: clerkUser.primaryPhoneNumber?.phoneNumber || pendingSignup?.phone || null,
+        role: (clerkUser.publicMetadata?.role as "landlord" | "tenant" | "admin") || "tenant",
+        created_at: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : new Date().toISOString(),
+        email: clerkUser.primaryEmailAddress?.emailAddress || "",
       }
-      return data as Profile;
-    } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
-      return null;
-    }
-  };
+    : null;
 
   const refreshProfile = async () => {
-    if (user) {
-      const prof = await fetchProfile(user.id);
-      setProfile(prof);
+    if (clerkUser) {
+      await clerkUser.reload();
     }
   };
 
-  useEffect(() => {
-    let authSubscription: any = null;
-
-    const initializeAuth = async () => {
-      try {
-        setLoading(true);
-
-        if (!isSupabaseConfigured || isMockMode) {
-          console.log("ℹ️ Initialized in Sandbox Auth Mode.");
-          const cachedSession = localStorage.getItem("nestlist_mock_session");
-          if (cachedSession) {
-            const parsed = JSON.parse(cachedSession);
-            setSession(parsed);
-            setUser(parsed.user);
-            const prof = await fetchProfile(parsed.user.id);
-            setProfile(prof);
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Try Live Supabase config on active mount
-        try {
-          const { data: { session: activeSession }, error } = await supabase.auth.getSession();
-          if (error) throw error;
-
-          if (activeSession) {
-            setSession(activeSession);
-            setUser(activeSession.user);
-            const prof = await fetchProfile(activeSession.user.id);
-            setProfile(prof);
-            setIsMockMode(false);
-          } else {
-            // Check mock session even if supabase is configured in case it was a mock login previously
-            const cachedSession = localStorage.getItem("nestlist_mock_session");
-            if (cachedSession) {
-              const parsed = JSON.parse(cachedSession);
-              setSession(parsed);
-              setUser(parsed.user);
-              const prof = await fetchProfile(parsed.user.id);
-              setProfile(prof);
-              activateMockMode();
-            } else {
-              setSession(null);
-              setUser(null);
-              setProfile(null);
-              setIsMockMode(false);
-            }
-          }
-        } catch (authError: any) {
-          console.warn("Supabase getSession failed, falling back to Sandbox Auth:", authError.message);
-          activateMockMode();
-          const cachedSession = localStorage.getItem("nestlist_mock_session");
-          if (cachedSession) {
-            const parsed = JSON.parse(cachedSession);
-            setSession(parsed);
-            setUser(parsed.user);
-            const prof = await fetchProfile(parsed.user.id);
-            setProfile(prof);
-          }
-        }
-
-        // Setup listener
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, currentSession) => {
-            if (isMockMode) return; // ignore live changes in mock mode
-            setLoading(true);
-            setSession(currentSession);
-            setUser(currentSession?.user ?? null);
-
-            if (currentSession?.user) {
-              const prof = await fetchProfile(currentSession.user.id);
-              setProfile(prof);
-            } else {
-              setProfile(null);
-            }
-            setLoading(false);
-          }
-        );
-        authSubscription = subscription;
-
-      } catch (err) {
-        console.error('Auth initialization failed:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      if (authSubscription) {
-        authSubscription.unsubscribe();
-      }
-    };
-  }, [isMockMode]);
-
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    const emailLower = email.trim().toLowerCase();
-
-    // 1. Try real Supabase auth if configured
-    if (isSupabaseConfigured && !isMockMode) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: emailLower,
-          password,
-        });
-
-        if (error) {
-          // If the error looks like a "Failed to fetch", fall back to mock auth
-          if (error.message.toLowerCase().includes("failed to fetch") || error.message.toLowerCase().includes("fetch failed")) {
-            console.warn("Supabase host offline. Activating Sandbox Auth fallback.");
-            activateMockMode();
-          } else {
-            setLoading(false);
-            return { user: null, profile: null, error };
-          }
-        } else if (data.user) {
-          const prof = await fetchProfile(data.user.id);
-          setSession(data.session);
-          setUser(data.user);
-          setProfile(prof);
-          setLoading(false);
-          return { user: data.user, profile: prof, error: null };
-        }
-      } catch (err: any) {
-        if (err.message?.toLowerCase().includes("failed to fetch") || err.message?.toLowerCase().includes("fetch failed")) {
-          console.warn("Supabase host offline during signin. Activating Sandbox Auth Mode.");
-          activateMockMode();
-        } else {
-          setLoading(false);
-          return { user: null, profile: null, error: err };
-        }
+    try {
+      setLoading(true);
+      if (!isSignInLoaded) {
+        throw new Error("Secure sign-in module is loading. Please retry in a moment.");
       }
-    }
 
-    // 2. Sandbox Mock Auth (either forced or fallback)
-    const db = getMockProfilesDb();
-    let mockUserAccount = db.find((u: any) => u.email.toLowerCase() === emailLower);
+      const attempt = await clerkSignIn.create({
+        identifier: email,
+        password,
+      });
 
-    if (mockUserAccount) {
-      if (mockUserAccount.password !== password) {
-        setLoading(false);
-        return { 
-          user: null, 
-          profile: null, 
-          error: new Error("Incorrect password for this sandbox account. Please verify your credentials or register a new one.") 
-        };
+      if (attempt.status === "complete") {
+        await setActive({ session: attempt.createdSessionId });
+        return { user: attempt, profile: null, error: null };
+      } else {
+        throw new Error(`Authentication incomplete. Unresolved authentication strategy callback status: ${attempt.status}`);
       }
-    } else {
-      // Auto-create a brand new sandbox account on the fly for any new logins in mock mode!
-      const newId = `usr-mock-${Date.now()}`;
-      mockUserAccount = {
-        id: newId,
-        email: emailLower,
-        password: password,
-        full_name: emailLower.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        phone: "+254712345678",
-        role: emailLower.includes('landlord') ? ('landlord' as const) : (emailLower.includes('admin') ? ('admin' as const) : ('tenant' as const)),
-        created_at: new Date().toISOString()
-      };
-      saveMockProfileToDb(mockUserAccount);
+    } catch (err: any) {
+      console.error("Clerk sign-in exception:", err);
+      return { user: null, profile: null, error: err };
+    } finally {
+      setLoading(false);
     }
-
-    const mockUser = {
-      id: mockUserAccount.id,
-      email: mockUserAccount.email,
-      user_metadata: {},
-      app_metadata: {},
-      aud: 'authenticated',
-      created_at: mockUserAccount.created_at,
-    } as any;
-
-    const mockSession = {
-      access_token: "mock-token-session",
-      token_type: "bearer",
-      expires_in: 3600,
-      refresh_token: "mock-refresh-token-session",
-      user: mockUser,
-    } as any;
-
-    localStorage.setItem("nestlist_mock_session", JSON.stringify(mockSession));
-    setSession(mockSession);
-    setUser(mockUser);
-    setProfile({
-      id: mockUserAccount.id,
-      full_name: mockUserAccount.full_name,
-      phone: mockUserAccount.phone,
-      role: mockUserAccount.role,
-      created_at: mockUserAccount.created_at
-    });
-    activateMockMode();
-    setLoading(false);
-    return { user: mockUser, profile: mockUserAccount, error: null };
   };
 
   const signUp = async (
@@ -339,151 +108,126 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     phone: string,
-    role: 'landlord' | 'tenant' | 'admin'
+    role: "landlord" | "tenant" | "admin"
   ) => {
-    setLoading(true);
-    const emailLower = email.trim().toLowerCase();
-
-    // 1. Try real Supabase auth if configured
-    if (isSupabaseConfigured && !isMockMode) {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: emailLower,
-          password,
-        });
-
-        if (error) {
-          if (error.message.toLowerCase().includes("failed to fetch") || error.message.toLowerCase().includes("fetch failed")) {
-            console.warn("Supabase host offline during register. Redirecting to Sandbox Auth.");
-            activateMockMode();
-          } else {
-            setLoading(false);
-            return { user: null, profile: null, error };
-          }
-        } else if (data.user) {
-          // Insert inside profiles table
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              full_name: fullName,
-              phone: phone || null,
-              role: role,
-            });
-
-          if (profileError) {
-            console.error("Profiles table insertion failed: ", profileError.message);
-          }
-
-          const prof = { id: data.user.id, full_name: fullName, phone: phone || null, role, created_at: new Date().toISOString() };
-          setLoading(false);
-          return { user: data.user, profile: prof, error: null };
-        }
-      } catch (err: any) {
-        if (err.message?.toLowerCase().includes("failed to fetch") || err.message?.toLowerCase().includes("fetch failed")) {
-          console.warn("Supabase host offline during register. Activating Sandbox Auth.");
-          activateMockMode();
-        } else {
-          setLoading(false);
-          return { user: null, profile: null, error: err };
-        }
+    try {
+      setLoading(true);
+      if (!isSignUpLoaded) {
+        throw new Error("Secure sign-up module is loading. Please retry in a moment.");
       }
+
+      const names = fullName.trim().split(/\s+/);
+      const firstName = names[0] || "";
+      const lastName = names.slice(1).join(" ") || "";
+
+      // Store selection metadata to apply after email verification
+      setPendingSignup({ role, phone });
+
+      // Call signUp.create
+      await clerkSignUp.create({
+        emailAddress: email,
+        password,
+        firstName,
+        lastName,
+      });
+
+      // Call prepareEmailAddressVerification
+      await clerkSignUp.prepareEmailAddressVerification({
+        strategy: "email_code",
+      });
+
+      setSignUpStep("verifying");
+      return { user: clerkSignUp, profile: null, error: null };
+    } catch (err: any) {
+      console.error("Clerk sign-up initialization exception:", err);
+      return { user: null, profile: null, error: err };
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 2. Sandbox Mock Auth SignUp
-    const db = getMockProfilesDb();
-    const existingIndex = db?.findIndex((u: any) => u.email.toLowerCase() === emailLower);
+  const submitOTP = async (code: string) => {
+    try {
+      setLoading(true);
+      if (!isSignUpLoaded) {
+        throw new Error("Authentication module load failure.");
+      }
 
-    let finalProfile: any;
+      // Call attemptEmailAddressVerification
+      const result = await clerkSignUp.attemptEmailAddressVerification({
+        code,
+      });
 
-    if (existingIndex !== -1 && existingIndex !== undefined) {
-      // Update existing sandbox account
-      finalProfile = {
-        ...db[existingIndex],
-        password: password,
-        full_name: fullName,
-        phone: phone || null,
-        role: role
-      };
-      db[existingIndex] = finalProfile;
-      localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(db));
-    } else {
-      // Create new sandbox account
-      const newId = `usr-mock-${Date.now()}`;
-      finalProfile = {
-        id: newId,
-        email: emailLower,
-        password: password,
-        full_name: fullName,
-        phone: phone || null,
-        role: role,
-        created_at: new Date().toISOString()
-      };
-      db.push(finalProfile);
-      localStorage.setItem("nestlist_mock_profiles_db", JSON.stringify(db));
+      if (result.status === "complete") {
+        const userId = result.createdUserId;
+        const role = pendingSignup?.role || "tenant";
+
+        // Assign user role in publicMetadata via full-featured backend pipeline proxy callback
+        try {
+          await fetch("/api/set-role", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId, role }),
+          });
+        } catch (apiErr) {
+          console.error("Failed to commit user role claims to modern backend registry:", apiErr);
+        }
+
+        // Complete the sign-up session process
+        await setActive({ session: result.createdSessionId });
+        setSignUpStep("completed");
+        return { success: true };
+      } else {
+        throw new Error(`OTP submission signature is incomplete: ${result.status}`);
+      }
+    } catch (err: any) {
+      console.error("Clerk OTP verification failed:", err);
+      throw err;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const mockUser = {
-      id: finalProfile.id,
-      email: finalProfile.email,
-      user_metadata: {},
-      app_metadata: {},
-      aud: 'authenticated',
-      created_at: finalProfile.created_at,
-    } as any;
-
-    const mockSession = {
-      access_token: "mock-token-session",
-      token_type: "bearer",
-      expires_in: 3600,
-      refresh_token: "mock-refresh-token-session",
-      user: mockUser,
-    } as any;
-
-    localStorage.setItem("nestlist_mock_session", JSON.stringify(mockSession));
-    setSession(mockSession);
-    setUser(mockUser);
-    setProfile({
-      id: finalProfile.id,
-      full_name: finalProfile.full_name,
-      phone: finalProfile.phone,
-      role: finalProfile.role,
-      created_at: finalProfile.created_at
+  const resendVerificationOTP = async () => {
+    if (!isSignUpLoaded) {
+      throw new Error("Authentication module state not synchronized.");
+    }
+    await clerkSignUp.prepareEmailAddressVerification({
+      strategy: "email_code",
     });
-    activateMockMode();
-    setLoading(false);
-    return { 
-      user: mockUser, 
-      profile: { id: finalProfile.id, full_name: finalProfile.full_name, phone: finalProfile.phone, role: finalProfile.role, created_at: finalProfile.created_at }, 
-      error: null 
-    };
   };
 
   const signOut = async () => {
     try {
       setLoading(true);
-      localStorage.removeItem("nestlist_mock_session");
-      localStorage.removeItem("nestlist_offline_mode");
-      setIsMockMode(!isSupabaseConfigured);
-      if (isSupabaseConfigured && !isMockMode) {
-        try {
-          await supabase.auth.signOut();
-        } catch (err) {
-          console.warn("Supabase signOut error:", err);
-        }
-      }
-      setSession(null);
-      setUser(null);
-      setProfile(null);
+      await clerkSignOut();
+      setSignUpStep("idle");
+      setPendingSignup(null);
     } catch (err: any) {
-      console.error('Error signing out:', err.message);
+      console.error("Clerk sign-out error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, isMockMode, signOut, refreshProfile, signIn, signUp }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        isMockMode: false,
+        signOut,
+        refreshProfile,
+        signIn,
+        signUp,
+        submitOTP,
+        signUpStep,
+        resendVerificationOTP,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -492,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
