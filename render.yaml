@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: nestlist
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm run start

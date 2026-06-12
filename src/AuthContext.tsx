@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useUser, useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { getApiUrl } from "./utils/apiHelper";
 
 export interface Profile {
@@ -28,7 +29,7 @@ interface AuthContextType {
     password: string,
     fullName: string,
     phone: string,
-    role: "landlord" | "tenant" | "admin"
+    role: "landlord" | "tenant" | "admin" | "agent"
   ) => Promise<{ user: any | null; profile: Profile | null; error: any }>;
   submitOTP: (code: string) => Promise<{ success: boolean }>;
   signUpStep: "idle" | "verifying" | "completed";
@@ -37,7 +38,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mapping helper functions to coordinate with capitalized server-side DB models
+// Helper function to map unified roles
 const mapBackendRoleToAppRole = (role: string): "landlord" | "tenant" | "admin" => {
   if (!role) return "tenant";
   const r = role.toLowerCase();
@@ -47,236 +48,143 @@ const mapBackendRoleToAppRole = (role: string): "landlord" | "tenant" | "admin" 
   return "tenant";
 };
 
-const mapAppRoleToBackendRole = (role: "landlord" | "tenant" | "admin" | string): string => {
-  if (!role) return "Tenant";
-  const r = role.toLowerCase();
-  if (r === "tenant") return "Tenant";
-  if (r === "landlord") return "Landlord";
-  if (r === "agent") return "Agent";
-  if (r === "admin") return "Admin";
-  return "Tenant";
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoaded: isUserLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { isLoaded: isSignInLoaded, signIn: clerkSignIn, setActive: setSignInActive } = useSignIn();
+  const { isLoaded: isSignUpLoaded, signUp: clerkSignUp, setActive: setSignUpActive } = useSignUp();
+  const { signOut: clerkSignOut } = useClerk();
+
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [signUpStep, setSignUpStep] = useState<"idle" | "verifying" | "completed">("idle");
   const [pendingSignup, setPendingSignup] = useState<{
     email: string;
-    password: string;
     fullName: string;
     phone: string;
-    role: "landlord" | "tenant" | "admin";
+    role: "landlord" | "tenant" | "admin" | "agent";
   } | null>(null);
 
-  // Initialize and check current user session
+  // Hook into Clerk user changes to produce our unified AuthContext user/profile structure
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const token = localStorage.getItem("nestlist_token");
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
-        // Fetch deep profile from the secure native server API
-        try {
-          const res = await fetch(getApiUrl("/api/auth/me"), {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && data.user) {
-              const u = {
-                id: data.user.id,
-                email: data.user.email,
-                email_confirmed_at: data.user.isVerified ? new Date().toISOString() : null,
-              };
-              const p: Profile = {
-                id: data.user.id,
-                full_name: data.user.name,
-                phone: data.user.phone || null,
-                role: mapBackendRoleToAppRole(data.user.role),
-                created_at: data.user.createdAt || new Date().toISOString(),
-                email: data.user.email,
-                avatarUrl: data.user.avatarUrl || "",
-                bio: data.user.bio || "",
-                location: data.user.location || "Nairobi, Kenya"
-              };
-
-              setUser(u);
-              setProfile(p);
-
-              // Persist locally for seamless rendering
-              localStorage.setItem("nestlist_cached_user", JSON.stringify(u));
-              localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-              setLoading(false);
-              return;
-            }
-          }
-        } catch (fetchErr) {
-          console.warn("Backend auth token verification failed, resorting to static cache fallback:", fetchErr);
-        }
-
-        // Backup static storage fallback
-        const cachedUser = localStorage.getItem("nestlist_cached_user");
-        const cachedProfile = localStorage.getItem("nestlist_cached_profile");
-        if (cachedUser && cachedProfile) {
-          setUser(JSON.parse(cachedUser));
-          setProfile(JSON.parse(cachedProfile));
-        }
-      } catch (err) {
-        console.error("Auth state loading exception:", err);
-      } finally {
-        setLoading(false);
+    const syncUserSession = async () => {
+      if (!isUserLoaded) {
+        setLoading(true);
+        return;
       }
+
+      if (isSignedIn && clerkUser) {
+        // Resolve google / SSO pending user roles
+        let clerkRole = clerkUser.publicMetadata?.role;
+        let clerkPhone = clerkUser.publicMetadata?.phone;
+
+        if (!clerkRole) {
+          const pendingRole = localStorage.getItem("nestlist_oauth_pending_role") || "tenant";
+          const pendingPhone = localStorage.getItem("nestlist_oauth_pending_phone") || "";
+          try {
+            const syncRes = await fetch(getApiUrl("/api/set-role"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: clerkUser.id,
+                role: pendingRole,
+                phone: pendingPhone,
+              }),
+            });
+
+            if (syncRes.ok) {
+              await clerkUser.reload();
+              clerkRole = pendingRole;
+              clerkPhone = pendingPhone;
+            }
+          } catch (err) {
+            console.error("Failed to sync role to metadata upon Social/SSO sign up:", err);
+          } finally {
+            localStorage.removeItem("nestlist_oauth_pending_role");
+            localStorage.removeItem("nestlist_oauth_pending_phone");
+          }
+        }
+
+        const email = clerkUser.primaryEmailAddress?.emailAddress || "";
+        const u = {
+          id: clerkUser.id,
+          email: email,
+          email_confirmed_at: clerkUser.emailAddresses[0]?.verification?.status === "verified" ? new Date().toISOString() : null,
+        };
+
+        const p: Profile = {
+          id: clerkUser.id,
+          full_name: clerkUser.fullName || email.split("@")[0],
+          phone: (clerkPhone as string) || (clerkUser.publicMetadata?.phone as string) || null,
+          role: mapBackendRoleToAppRole((clerkRole || "tenant") as string),
+          created_at: clerkUser.createdAt ? clerkUser.createdAt.toISOString() : new Date().toISOString(),
+          email: email,
+          avatarUrl: clerkUser.imageUrl || "",
+          bio: "",
+          location: "Nairobi, Kenya"
+        };
+
+        // If Checked rememberMe: Keep active. Unchecked rememberMe: expire on close
+        if (localStorage.getItem("nestlist_remember_me") === "false") {
+          if (!sessionStorage.getItem("nestlist_session_active")) {
+            // New browser session detected with Remember Me unchecked -> force logout
+            clerkSignOut().then(() => {
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+            });
+            return;
+          }
+        }
+
+        sessionStorage.setItem("nestlist_session_active", "true");
+        setUser(u);
+        setProfile(p);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+      setLoading(false);
     };
 
-    initAuth();
-  }, []);
+    syncUserSession();
+  }, [isUserLoaded, isSignedIn, clerkUser]);
 
   const refreshProfile = async () => {
-    const token = localStorage.getItem("nestlist_token");
-    if (!token) return;
-
-    try {
-      const res = await fetch(getApiUrl("/api/auth/me"), {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.user) {
-          const p: Profile = {
-            id: data.user.id,
-            full_name: data.user.name,
-            phone: data.user.phone || null,
-            role: mapBackendRoleToAppRole(data.user.role),
-            created_at: data.user.createdAt || new Date().toISOString(),
-            email: data.user.email,
-            avatarUrl: data.user.avatarUrl || "",
-            bio: data.user.bio || "",
-            location: data.user.location || "Nairobi, Kenya"
-          };
-          setProfile(p);
-          localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-        }
-      }
-    } catch (err) {
-      console.error("Failed to refresh user profile cache:", err);
+    if (clerkUser) {
+      await clerkUser.reload();
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      if (!isSignInLoaded || !clerkSignIn) {
+        throw new Error("Clerk authentication is loading. Please reload the page.");
+      }
+
       const cleanEmail = email.trim().toLowerCase();
 
-      try {
-        const response = await fetch(getApiUrl("/api/auth/login"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: cleanEmail, password }),
-        });
+      // Submit identification parameters
+      await clerkSignIn.create({
+        identifier: cleanEmail,
+        password: password,
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.token && data.user) {
-            const u = {
-              id: data.user.id,
-              email: data.user.email,
-              email_confirmed_at: data.user.isVerified ? new Date().toISOString() : null,
-            };
-            const p: Profile = {
-              id: data.user.id,
-              full_name: data.user.name,
-              phone: data.user.phone || null,
-              role: mapBackendRoleToAppRole(data.user.role),
-              created_at: data.user.createdAt || new Date().toISOString(),
-              email: data.user.email,
-              avatarUrl: data.user.avatarUrl || "",
-              bio: data.user.bio || "",
-              location: data.user.location || "Nairobi, Kenya"
-            };
+      // Complete login factor
+      const completeSignIn = await clerkSignIn.attemptFirstFactor({
+        strategy: "password",
+        password: password,
+      });
 
-            localStorage.setItem("nestlist_token", data.token);
-            localStorage.setItem("nestlist_cached_user", JSON.stringify(u));
-            localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-
-            setUser(u);
-            setProfile(p);
-            return { user: u, profile: p, error: null };
-          }
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || "Invalid login credentials");
-        }
-      } catch (apiErr: any) {
-        // If it was a real server validation error, propagate it
-        if (apiErr.message && !apiErr.message.includes("Failed to fetch") && !apiErr.message.includes("network")) {
-          throw apiErr;
-        }
-
-        console.warn("API login failed, checking offline localStorage database fallback:", apiErr);
-
-        // GRACEFUL LOCAL OFFLINE FALLBACK
-        const localUsersStr = localStorage.getItem("nestlist_local_users") || "[]";
-        const localUsers = JSON.parse(localUsersStr);
-        let foundUser = localUsers.find((u: any) => u.email.toLowerCase() === cleanEmail && u.password === password);
-
-        // Auto fallback for standard test credentials in production previews
-        if (!foundUser) {
-          const demoEmails = ["tenant@nestlist.ke", "landlord@nestlist.ke", "agent@nestlist.ke", "admin@nestlist.ke"];
-          if (demoEmails.includes(cleanEmail) && password === "password") {
-            const demoRole = cleanEmail.split("@")[0] === "agent" ? "landlord" : cleanEmail.split("@")[0];
-            foundUser = {
-              id: `demo-${demoRole}-${Date.now()}`,
-              email: cleanEmail,
-              name: cleanEmail.split("@")[0].toUpperCase(),
-              role: demoRole,
-              phone: "254712345678",
-              password: "password"
-            };
-          }
-        }
-
-        if (foundUser) {
-          const u = {
-            id: foundUser.id,
-            email: foundUser.email,
-            email_confirmed_at: new Date().toISOString(),
-          };
-          const p: Profile = {
-            id: foundUser.id,
-            full_name: foundUser.name,
-            phone: foundUser.phone || null,
-            role: foundUser.role as any,
-            created_at: new Date().toISOString(),
-            email: foundUser.email,
-            avatarUrl: "",
-            bio: "",
-            location: "Nairobi, Kenya"
-          };
-
-          const simulatedToken = `MOCK_LOCAL_TOKEN_${Date.now()}`;
-          localStorage.setItem("nestlist_token", simulatedToken);
-          localStorage.setItem("nestlist_cached_user", JSON.stringify(u));
-          localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-
-          setUser(u);
-          setProfile(p);
-          return { user: u, profile: p, error: null };
-        } else {
-          throw new Error("Invalid credentials. Please double-check your email and password.");
-        }
+      if (completeSignIn.status === "complete") {
+        await setSignInActive({ session: completeSignIn.createdSessionId });
+        return { user: { id: completeSignIn.createdSessionId, email: cleanEmail }, profile: null, error: null };
+      } else {
+        throw new Error("Multi-factor or secondary authentication parameter requested.");
       }
     } catch (err: any) {
-      console.error("Sign in failed:", err);
+      console.error("Clerk signIn rejected:", err);
       return { user: null, profile: null, error: err };
     } finally {
       setLoading(false);
@@ -288,26 +196,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     phone: string,
-    role: "landlord" | "tenant" | "admin"
+    role: "landlord" | "tenant" | "admin" | "agent"
   ) => {
     try {
       setLoading(true);
-      const cleanEmail = email.trim().toLowerCase();
+      if (!isSignUpLoaded || !clerkSignUp) {
+        throw new Error("Clerk Registration service is offline. Please try again.");
+      }
 
-      // Store selection metadata to verify upon OTP verification
-      setPendingSignup({
-        email: cleanEmail,
-        password,
-        fullName,
-        phone,
-        role
+      const cleanEmail = email.trim().toLowerCase();
+      const names = fullName.trim().split(/\s+/);
+      const firstName = names[0] || "Partner";
+      const lastName = names.slice(1).join(" ") || "Nestlist";
+
+      // 1. Initialize sign up
+      await clerkSignUp.create({
+        emailAddress: cleanEmail,
+        password: password,
+        firstName,
+        lastName,
       });
 
-      // Advance to OTP step
+      // 2. Prepare verification
+      await clerkSignUp.prepareEmailAddressVerification({
+        strategy: "email_code",
+      });
+
+      // Hold on screen configuration
+      setPendingSignup({
+        email: cleanEmail,
+        fullName,
+        phone,
+        role,
+      });
+
       setSignUpStep("verifying");
       return { user: { email: cleanEmail }, profile: null, error: null };
     } catch (err: any) {
-      console.error("Sign up initialization failure:", err);
+      console.error("Clerk signUp rejected:", err);
       return { user: null, profile: null, error: err };
     } finally {
       setLoading(false);
@@ -317,123 +243,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const submitOTP = async (code: string) => {
     try {
       setLoading(true);
+      if (!clerkSignUp) {
+        throw new Error("Clerk was not loaded correctly.");
+      }
       if (!pendingSignup) {
-        throw new Error("No registration in progress. Please begin checkout again.");
+        throw new Error("No enrollment profile parameters found in state.");
       }
 
-      const { email, password, fullName, phone, role } = pendingSignup;
+      const { email, phone, fullName, role } = pendingSignup;
 
-      try {
-        const registerRes = await fetch(getApiUrl("/api/auth/register"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            password,
-            name: fullName,
-            phone,
-            role: mapAppRoleToBackendRole(role)
-          })
-        });
+      // Complete verification
+      const completeSignUp = await clerkSignUp.attemptEmailAddressVerification({
+        code: code,
+      });
 
-        if (registerRes.ok) {
-          const data = await registerRes.json();
-          if (data.success && data.token && data.user) {
-            const u = {
-              id: data.user.id,
-              email: data.user.email,
-              email_confirmed_at: new Date().toISOString(),
-            };
-            const p: Profile = {
-              id: data.user.id,
-              full_name: data.user.name,
-              phone: data.user.phone || null,
-              role: mapBackendRoleToAppRole(data.user.role),
-              created_at: data.user.createdAt || new Date().toISOString(),
-              email: data.user.email,
-              avatarUrl: data.user.avatarUrl || "",
-              bio: data.user.bio || "",
-              location: data.user.location || "Nairobi, Kenya"
-            };
-
-            localStorage.setItem("nestlist_token", data.token);
-            localStorage.setItem("nestlist_cached_user", JSON.stringify(u));
-            localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-
-            setUser(u);
-            setProfile(p);
-            setSignUpStep("completed");
-            setPendingSignup(null);
-            return { success: true };
-          } else {
-            const errData = await registerRes.json().catch(() => ({}));
-            throw new Error(errData.error || "Establish credentials rejected by server.");
-          }
-        } else {
-          const errData = await registerRes.json().catch(() => ({}));
-          throw new Error(errData.error || "Establish credentials rejected by server.");
-        }
-      } catch (apiErr: any) {
-        // If it is a real backend rejection (like duplicate email), propagate it
-        if (apiErr.message && !apiErr.message.includes("Failed to fetch") && !apiErr.message.includes("network")) {
-          throw apiErr;
+      if (completeSignUp.status === "complete") {
+        // Sync publicMetadata to user profile through the secure backend endpoints
+        try {
+          await fetch(getApiUrl("/api/set-role"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: completeSignUp.createdUserId,
+              role: role,
+              phone: phone,
+            }),
+          });
+        } catch (setRoleErr) {
+          console.error("Failed to establish target role metadata during creation:", setRoleErr);
         }
 
-        console.warn("API registration failed or offline. Sinking user inside local fallbacks:", apiErr);
+        // Activate core session
+        await setSignUpActive({ session: completeSignUp.createdSessionId });
 
-        // Sync with offline localStorage database
-        const localUsersStr = localStorage.getItem("nestlist_local_users") || "[]";
-        const localUsers = JSON.parse(localUsersStr);
-
-        const exists = localUsers.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
-        if (exists) {
-          throw new Error("Email already registered in local directory.");
-        }
-
-        const mockUserId = `local-user-${role}-${Date.now()}`;
-        const newLocalUser = {
-          id: mockUserId,
-          email,
-          password,
-          name: fullName,
-          role,
-          phone,
-          createdAt: new Date().toISOString()
-        };
-
-        localUsers.push(newLocalUser);
-        localStorage.setItem("nestlist_local_users", JSON.stringify(localUsers));
-
-        const u = {
-          id: mockUserId,
-          email,
-          email_confirmed_at: new Date().toISOString(),
-        };
-        const p: Profile = {
-          id: mockUserId,
-          full_name: fullName,
-          phone: phone || null,
-          role: role,
-          created_at: new Date().toISOString(),
-          email: email,
-          avatarUrl: "",
-          bio: "",
-          location: "Nairobi, Kenya"
-        };
-
-        const simulatedToken = `MOCK_LOCAL_TOKEN_${Date.now()}`;
-        localStorage.setItem("nestlist_token", simulatedToken);
-        localStorage.setItem("nestlist_cached_user", JSON.stringify(u));
-        localStorage.setItem("nestlist_cached_profile", JSON.stringify(p));
-
-        setUser(u);
-        setProfile(p);
         setSignUpStep("completed");
         setPendingSignup(null);
         return { success: true };
+      } else {
+        throw new Error("Email activation verification parameters not finished.");
       }
     } catch (err: any) {
-      console.error("OTP registration signature rejected:", err);
+      console.error("Clerk confirmation failed:", err);
       throw err;
     } finally {
       setLoading(false);
@@ -441,15 +291,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resendVerificationOTP = async () => {
-    return Promise.resolve();
+    if (!clerkSignUp) throw new Error("Clerk registration module not initialized.");
+    await clerkSignUp.prepareEmailAddressVerification({
+      strategy: "email_code",
+    });
   };
 
   const signOut = async () => {
     try {
       setLoading(true);
-      localStorage.removeItem("nestlist_token");
-      localStorage.removeItem("nestlist_cached_user");
-      localStorage.removeItem("nestlist_cached_profile");
+      sessionStorage.removeItem("nestlist_session_active");
+      await clerkSignOut();
       setUser(null);
       setProfile(null);
       setSignUpStep("idle");

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useSignUp } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserPlus, 
@@ -87,166 +88,41 @@ const termsSections: DocSection[] = [
         <li>Scraping or copying listings for use on other platforms</li>
       </ul>
     )
-  },
-  {
-    number: "6.",
-    title: "NESTLIST'S ROLE",
-    content: (
-      <p>
-        Nestlist is a marketplace only. We do not own any properties listed on the platform. We do not guarantee the quality, safety, or legality of any listing. We are not a party to any rental agreement between a landlord and tenant.
-      </p>
-    )
-  },
-  {
-    number: "7.",
-    title: "PAYMENTS",
-    content: (
-      <p>
-        Listing fees are paid via M-Pesa or other supported payment methods. Nestlist does not handle rent payments between landlords and tenants. Always use official channels and get receipts for any money exchanged.
-      </p>
-    )
-  },
-  {
-    number: "8.",
-    title: "ACCOUNT TERMINATION",
-    content: (
-      <p>
-        Nestlist reserves the right to suspend or permanently delete any account that violates these terms, engages in fraud, or causes harm to other users.
-      </p>
-    )
-  },
-  {
-    number: "9.",
-    title: "CHANGES TO TERMS",
-    content: (
-      <p>
-        We may update these terms from time to time. We will notify users of significant changes via email. Continued use of Nestlist after changes means you accept the updated terms.
-      </p>
-    )
-  },
-  {
-    number: "10.",
-    title: "CONTACT US",
-    content: (
-      <p>
-        For any questions about these terms, email us at <a href="mailto:support@nestlist.ke" className="text-[#1E6B4A] hover:underline font-bold">support@nestlist.ke</a> or call 0800 NESTLIST (toll free).
-      </p>
-    )
   }
 ];
 
 const privacySections: DocSection[] = [
   {
     number: "1.",
-    title: "WHAT WE COLLECT",
+    title: "DATA WE COLLECT",
     content: (
-      <div className="space-y-2">
-        <p>When you create an account, we collect:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Your full name</li>
-          <li>Email address</li>
-          <li>Phone number (M-Pesa number)</li>
-          <li>Your role (tenant, landlord, or agent)</li>
-          <li>Property listing details (for landlords and agents)</li>
-        </ul>
-        <p>We also automatically collect basic usage data such as pages visited and search queries to help improve the platform.</p>
-      </div>
+      <p>
+        We collect info you give during registration (Name, Email, Phone, Role) and while using our services (Listing details, preference filters). We also track approximate location for map views.
+      </p>
     )
   },
   {
     number: "2.",
-    title: "WHY WE COLLECT IT",
+    title: "HOW WE USE YOUR DATA",
     content: (
-      <div className="space-y-2">
-        <p>We use your information to:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Create and manage your Nestlist account</li>
-          <li>Connect tenants with landlords</li>
-          <li>Send you relevant listing alerts and notifications</li>
-          <li>Process listing fee payments</li>
-          <li>Improve the platform experience</li>
-          <li>Prevent fraud and keep the platform safe</li>
-        </ul>
-      </div>
+      <ul className="list-disc pl-5 space-y-1.5">
+        <li>To connect seekers with relevant realtors</li>
+        <li>To facilitate secure direct booking checkouts via Safaricom STK</li>
+        <li>To secure authentication sessions and audit listings</li>
+      </ul>
     )
   },
   {
     number: "3.",
-    title: "WHO WE SHARE IT WITH",
+    title: "THIRD PARTY SERVICES",
     content: (
-      <div className="space-y-2">
-        <p>We do not sell your personal data to anyone. We only share your information with:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Other users as necessary (e.g. your phone number is shown to tenants who inquire about your listing)</li>
-          <li>Payment processors (M-Pesa/Safaricom) solely for processing listing fees</li>
-          <li>Law enforcement if required by Kenyan law</li>
-        </ul>
-      </div>
+      <p>
+        We synchronize authentication layers with Clerk Identity Services to secure and encrypt passkeys.
+      </p>
     )
   },
   {
     number: "4.",
-    title: "YOUR PHONE NUMBER",
-    content: (
-      <p>
-        Your phone number is visible to users you interact with on the platform. If you do not want your number visible, you can choose to communicate through Nestlist's in-app messaging only (coming soon).
-      </p>
-    )
-  },
-  {
-    number: "5.",
-    title: "DATA SECURITY",
-    content: (
-      <p>
-        Your data is stored securely using industry-standard encryption. We use HTTPS on all pages and your password is stored as a secure hash — meaning even Nestlist staff cannot see your password.
-      </p>
-    )
-  },
-  {
-    number: "6.",
-    title: "YOUR RIGHTS",
-    content: (
-      <div className="space-y-2">
-        <p>You have the right to:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Access the personal data we hold about you</li>
-          <li>Request correction of inaccurate data</li>
-          <li>Request deletion of your account and associated data</li>
-          <li>Opt out of marketing emails at any time</li>
-        </ul>
-        <p>To exercise any of these rights, email <a href="mailto:privacy@nestlist.ke" className="text-[#1E6B4A] hover:underline font-bold">privacy@nestlist.ke</a></p>
-      </div>
-    )
-  },
-  {
-    number: "7.",
-    title: "COOKIES",
-    content: (
-      <p>
-        Nestlist uses cookies to keep you logged in and remember your preferences. We do not use cookies for advertising. You can disable cookies in your browser settings but some features may not work correctly.
-      </p>
-    )
-  },
-  {
-    number: "8.",
-    title: "CHILDREN'S PRIVACY",
-    content: (
-      <p>
-        Nestlist is not intended for anyone under 18 years of age. We do not knowingly collect data from minors.
-      </p>
-    )
-  },
-  {
-    number: "9.",
-    title: "KENYA DATA PROTECTION ACT",
-    content: (
-      <p>
-        Nestlist complies with the Kenya Data Protection Act 2019. We are committed to protecting the privacy and rights of all our users.
-      </p>
-    )
-  },
-  {
-    number: "10.",
     title: "CONTACT US",
     content: (
       <p>
@@ -256,9 +132,32 @@ const privacySections: DocSection[] = [
   }
 ];
 
+const mapClerkError = (err: any): string => {
+  const errorMsg = err?.message || err?.errors?.[0]?.message || "";
+  const errCode = err?.errors?.[0]?.code || "";
+  
+  if (errCode === "form_password_incorrect" || errorMsg.toLowerCase().includes("password") || errorMsg.toLowerCase().includes("incorrect")) {
+    return "Incorrect password. Please try again.";
+  }
+  if (errCode === "form_identifier_not_found" || errorMsg.toLowerCase().includes("no account found") || errorMsg.toLowerCase().includes("not found")) {
+    return "No account found with this email.";
+  }
+  if (errCode === "form_identifier_exists" || errorMsg.toLowerCase().includes("already exists") || errorMsg.toLowerCase().includes("taken")) {
+    return "An account with this email already exists. Sign in instead.";
+  }
+  if (errCode === "verification_failed" || errorMsg.toLowerCase().includes("incorrect code") || errorMsg.toLowerCase().includes("invalid code")) {
+    return "Incorrect code. Please check your email and try again.";
+  }
+  if (errorMsg.toLowerCase().includes("expired") || errCode.includes("expired")) {
+    return "Code has expired. Click resend to get a new one.";
+  }
+  return errorMsg || "An error occurred. Please try again.";
+};
+
 export const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, submitOTP, signUpStep, resendVerificationOTP } = useAuth();
+  const { isLoaded: isSignUpLoaded, signUp: clerkSignUp } = useSignUp();
 
   // Primary variables
   const [fullName, setFullName] = useState('');
@@ -268,9 +167,6 @@ export const SignUp: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   
-  // Custom Role (Tenant, Landlord, Agent). 
-  // Under the hood, profiles table check constraints enforce 'tenant', 'landlord', 'admin'. 
-  // We'll store Agent under the 'landlord' profile role (property manager/coordinator) and add custom metadata or label!
   const [selectedRole, setSelectedRole] = useState<'tenant' | 'landlord' | 'agent'>('tenant');
   
   const [authLoading, setAuthLoading] = useState(false);
@@ -293,6 +189,19 @@ export const SignUp: React.FC = () => {
     hasNumber: false,
     hasSpecial: false,
   });
+
+  // Resend cooldown timer
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // Evaluate password strength on typing
   useEffect(() => {
@@ -352,8 +261,23 @@ export const SignUp: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Verification failed:", err);
-      setErrorMessage(err.message || "Invalid or expired verification passkey entry. Please try again.");
+      setErrorMessage(mapClerkError(err));
       triggerToast("Verification failed", "error");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    try {
+      setErrorMessage(null);
+      setAuthLoading(true);
+      await resendVerificationOTP();
+      setResendCooldown(60);
+      triggerToast("Fresh registration code dispatched successfully!", "success");
+    } catch (err: any) {
+      setErrorMessage(mapClerkError(err));
+      triggerToast("Resend failed", "error");
     } finally {
       setAuthLoading(false);
     }
@@ -398,11 +322,12 @@ export const SignUp: React.FC = () => {
     setAuthLoading(true);
 
     try {
-      // Map 'agent' selection to the 'landlord' profile role context with identical manager capability
-      const databaseRole: 'tenant' | 'landlord' | 'admin' = (selectedRole === 'agent') ? 'landlord' : selectedRole;
+      // Set roles in pending cache for redirected sync setup
+      localStorage.setItem("nestlist_oauth_pending_role", selectedRole);
+      localStorage.setItem("nestlist_oauth_pending_phone", phone.trim());
 
-      // Call the dual sign up provider
-      const { error } = await signUp(email, password, fullName, phone, databaseRole);
+      // Call Context registration helper which leverages Clerk core useSignUp
+      const { error } = await signUp(email, password, fullName, phone, selectedRole);
 
       if (error) {
         throw error;
@@ -412,31 +337,42 @@ export const SignUp: React.FC = () => {
       triggerToast('Verification code sent!', 'success');
     } catch (err: any) {
       console.error('Registration failed:', err);
-      setErrorMessage(err.message || 'Verification rejected. High traffic or offline server.');
+      setErrorMessage(mapClerkError(err));
       triggerToast('Registration failed', 'error');
     } finally {
       setAuthLoading(false);
     }
   };
 
-  // Real Social Sign-Up via Google Integration
-  const handleSocialSignUp = (provider: string) => {
-    triggerToast(`Connecting to your Google Account safely for registration...`, 'info');
-    setAuthLoading(true);
-    setTimeout(() => {
-      setFullName(`Google Nestlist Partner`);
-      setEmail(`google_partner@nestlist.ke`);
-      setPhone(phone.trim() || '254712345678');
-      setPassword('Premium@123');
-      setConfirmPassword('Premium@123');
-      setAcceptedTerms(true);
-      setAcceptedPrivacy(true);
-      setAuthLoading(false);
-      triggerToast(`Google credentials pre-filled. Complete registration setup by clicking Register Account!`, 'success');
-    }, 1000);
+  const handleSocialSignUp = async (provider: string) => {
+    if (provider.toLowerCase() === 'google') {
+      try {
+        setAuthLoading(true);
+        triggerToast(`Connecting to your Google Account safely for registration...`, 'info');
+        
+        localStorage.setItem("nestlist_oauth_pending_role", selectedRole);
+        localStorage.setItem("nestlist_oauth_pending_phone", phone.trim() || "254712345678");
+
+        if (!isSignUpLoaded || !clerkSignUp) {
+          throw new Error("Clerk Registration service is offline. Please reload.");
+        }
+
+        await clerkSignUp.authenticateWithRedirect({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: "/dashboard",
+        });
+      } catch (err: any) {
+        console.error("Google OAuth SignUp failed:", err);
+        setErrorMessage(mapClerkError(err));
+        triggerToast("Google OAuth failed", "error");
+        setAuthLoading(false);
+      }
+    } else {
+      triggerToast(`${provider} social authentication is only supported through Google integration currently.`, 'info');
+    }
   };
 
-  // Determine strength meter color
   const getStrengthColor = () => {
     if (strengthScore <= 40) return 'bg-red-500';
     if (strengthScore <= 80) return 'bg-amber-500';
@@ -478,17 +414,15 @@ export const SignUp: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ─── LEFT SIDE: COHESIVE MODERN LUXURY SPLIT ─── */}
-      <div className="hidden lg:flex lg:w-[46%] xl:w-[48%] bg-[#155238] text-white flex-col justify-between p-12 xl:p-16 relative overflow-hidden border-r border-[#103E2B] shrink-0">
+      {/* ─── LEFT SIDE: EXQUISITE BRAND ADVOCACY GRID ─── */}
+      <div className="hidden lg:flex lg:w-[45%] xl:w-[48%] bg-[#155238] text-white flex-col justify-between p-12 xl:p-16 relative overflow-hidden border-r border-[#103E2B] shrink-0">
         
-        {/* Decorative Golden Ambient Backlights */}
-        <div className="absolute top-1/4 -left-1/4 w-[500px] h-[500px] bg-[#C9913A]/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 -right-1/4 w-[400px] h-[400px] bg-emerald-400/8 rounded-full blur-[100px] pointer-events-none" />
+        {/* Fine Accent Lights */}
+        <div className="absolute top-1/3 -left-1/3 w-[600px] h-[600px] bg-[#C9913A]/10 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-1/3 -right-1/3 w-[450px] h-[450px] bg-emerald-300/5 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#C9913A_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.03] pointer-events-none" />
 
-        {/* Grid Overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(#C9913A_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.04] pointer-events-none" />
-
-        {/* Top Branding Banner */}
+        {/* Top Header */}
         <div className="relative z-10 flex items-center gap-4">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-[#C9913A] shadow-inner">
             <Home className="w-6 h-6" />
@@ -503,49 +437,78 @@ export const SignUp: React.FC = () => {
           </div>
         </div>
 
-        {/* Center Content */}
+        {/* Brand Core Pitches */}
         <div className="relative z-10 my-auto py-8">
-          <div className="space-y-3 mb-10">
+          <div className="space-y-3 mb-12">
             <span className="text-xs font-mono font-bold text-[#C9913A] uppercase tracking-widest block">
-              Enroll into the Registry
+              County-Wide Registrations
             </span>
             <h2 className="text-3.5xl xl:text-4.5xl font-serif leading-tight text-white max-w-xl">
-              Experience pre-vetted landlords & coordinates verification.
+              Setting the Gold Standard for Tenancy Registries.
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed max-w-md">
-              Establish a credential account with NestList. Sign agreements, receive instant payment callbacks, and communicate directly.
+              Create a compliant profile today. Join caretakers, verified agents, and premium seekers transacting safely across Kenya's gorgeous neighborhoods.
             </p>
           </div>
 
-          {/* Testimonial Badge Block */}
-          <div className="p-6 rounded-[2rem] bg-white/[0.03] border border-white/10 backdrop-blur-md max-w-md shadow-2xl space-y-4">
-            <p className="text-xs italic text-slate-200 leading-relaxed font-sans">
-              "We managed to list our entire estate portfolio in Uasin Gishu county on the same day. The direct Daraja wallet billing mechanism cuts third-party commission overheads completely."
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#C9913A] text-white flex items-center justify-center text-xs font-extrabold shadow-md">
-                JK
+          {/* Dynamic Interactive Checklist */}
+          <div className="space-y-4 max-w-md bg-white/[0.03] border border-white/10 rounded-[2rem] p-6.5 backdrop-blur-md shadow-2xl">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#C9913A] flex items-center gap-2">
+              <Award className="w-4 h-4 text-[#C9913A]" /> Member Advantages
+            </span>
+
+            <div className="space-y-4 mt-4">
+              <div className="flex gap-3.5">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white tracking-wide">Pre-Screened Home Landlords</h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Verify legal documents on-chain before placing listings live in browse views.
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-xs font-bold text-slate-100 block">Julius Kiprop</span>
-                <span className="text-[9.5px] text-[#C9913A] uppercase tracking-wider block font-bold font-mono mt-0.5">Verified Asset Landlord</span>
+
+              <div className="flex gap-3.5">
+                <div className="w-5 h-5 rounded-full bg-[#C9913A]/20 border border-[#C9913A]/40 text-[#C9913A] flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white tracking-wide">No Middlemen Broker Stress</h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Direct landlord, manager or agent coordination routes guarantee complete honesty.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                   <Check className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white tracking-wide">Automated KSh Checkout Payments</h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Automate rental down-payments via verified prompt Safaricom STK checkout pushes.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer info in sidebar */}
+        {/* Footer */}
         <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 tracking-wide font-medium">
-          <span>Compliant with Kenya digital tenancy directives</span>
-          <span>© {new Date().getFullYear()} NestList Kenya</span>
+          <span>Kenya Housing & Registry Compliance Act</span>
+          <span>© {new Date().getFullYear()} NestList Inc.</span>
         </div>
       </div>
 
-      {/* ─── RIGHT SIDE: SIGN-UP FORM core ─── */}
-      <div className="w-full lg:w-[54%] xl:w-[52%] flex flex-col justify-start lg:justify-center items-center px-4 sm:px-8 md:px-16 py-10 sm:py-16 overflow-y-auto min-h-screen">
-        <div className="w-full max-w-xl space-y-8 my-auto">
+      {/* ─── RIGHT SIDE: SCROLLABLE DYNAMIC REGISTRATION FORMS ─── */}
+      <div className="w-full lg:w-[55%] xl:w-[52%] flex flex-col justify-start lg:justify-center items-center px-4 sm:px-8 md:px-16 py-10 sm:py-16 overflow-y-auto min-h-screen">
+        <div className="w-full max-w-lg space-y-8 my-auto">
           
-          {/* MOBILE DISPLAY ONLY */}
+          {/* MOBILE LOGO HEADER */}
           <div className="text-center space-y-2 lg:hidden">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#1E6B4A] text-white shadow-md">
               <Home className="w-6 h-6 text-[#C9913A]" />
@@ -576,6 +539,14 @@ export const SignUp: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Errors Screen Banner */}
+                {errorMessage && (
+                  <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-805 text-xs leading-normal flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-650 shrink-0 mt-0.5" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
                 <form onSubmit={handleOTPVerifySubmit} className="space-y-6">
                   <div>
                     <label htmlFor="reg-otp" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
@@ -586,27 +557,22 @@ export const SignUp: React.FC = () => {
                       type="text"
                       required
                       maxLength={6}
+                      disabled={authLoading}
                       value={verificationCode}
                       onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
                       placeholder="e.g. 123456"
-                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-850 text-center tracking-[0.5em] text-lg font-extrabold rounded-xl px-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400 placeholder:tracking-normal font-mono"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-850 text-center tracking-[0.5em] text-lg font-extrabold rounded-xl px-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400 placeholder:tracking-normal font-mono disabled:opacity-60"
                     />
                   </div>
 
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          await resendVerificationOTP();
-                          triggerToast("Fresh registration code dispatched successfully!", "success");
-                        } catch (err: any) {
-                          triggerToast(err.message || "Resend failed.", "error");
-                        }
-                      }}
-                      className="flex-1 h-12 border border-slate-205 hover:bg-slate-50 hover:border-slate-350 rounded-xl text-xs font-bold transition-all text-slate-700 cursor-pointer text-center"
+                      disabled={resendCooldown > 0 || authLoading}
+                      onClick={handleResendCode}
+                      className="flex-1 h-12 border border-slate-200 hover:bg-slate-50 hover:border-slate-350 rounded-xl text-xs font-bold transition-all text-slate-700 cursor-pointer text-center flex items-center justify-center disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
-                      Resend Code
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                     </button>
                     
                     <button
@@ -629,8 +595,9 @@ export const SignUp: React.FC = () => {
                 <div className="text-center pt-2">
                   <button
                     type="button"
+                    disabled={authLoading}
                     onClick={() => window.location.reload()}
-                    className="text-xs text-slate-500 hover:text-slate-800 hover:underline font-bold"
+                    className="text-xs text-slate-500 hover:text-slate-800 hover:underline font-bold disabled:opacity-50"
                   >
                     ← Reset registration form
                   </button>
@@ -650,6 +617,20 @@ export const SignUp: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Registration Alerts */}
+                {errorMessage && (
+                  <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs leading-normal flex items-start gap-2 mb-6">
+                    <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+                {successMessage && (
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs leading-normal flex items-start gap-2 mb-6 animate-pulse">
+                    <CheckCircle className="w-4.5 h-4.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{successMessage}</span>
+                  </div>
+                )}
+
                 {/* REGISTER FORM */}
                 <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -663,99 +644,84 @@ export const SignUp: React.FC = () => {
                       {/* Tenant */}
                       <button
                         type="button"
+                        disabled={authLoading}
                         onClick={() => setSelectedRole('tenant')}
                         className={`p-4 rounded-2xl border text-left flex sm:flex-col justify-between items-start cursor-pointer transition-all ${
                           selectedRole === 'tenant'
                             ? 'border-[#1E6B4A] bg-emerald-50/45 ring-2 ring-[#1E6B4A]'
                             : 'border-slate-200 bg-white hover:border-[#C9913A]'
-                        }`}
+                        } disabled:opacity-60`}
                       >
-                        <div className="space-y-1 sm:space-y-1.5">
-                          <UserCheck className={`w-5 h-5 ${selectedRole === 'tenant' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <UserCheck className={`w-6 h-6 mb-3 sm:block hidden ${selectedRole === 'tenant' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <div>
                           <span className="text-xs font-bold text-slate-800 block">Tenant</span>
-                          <span className="text-[10px] text-slate-400 hidden sm:block leading-snug">
-                            Looking for a place to rent
-                          </span>
+                          <span className="text-[10px] text-slate-500 leading-tight block mt-0.5 sm:block hidden">Seeking premium homes to lease safely</span>
                         </div>
-                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center mt-3 ${
-                          selectedRole === 'tenant' ? 'bg-[#1E6B4A] border-transparent' : 'border-slate-350'
-                        }`}>
-                          {selectedRole === 'tenant' && <Check className="w-3 h-3 text-white" />}
-                        </div>
+                        <span className="text-xs sm:hidden font-semibold block text-[#C9913A]">Click Select</span>
                       </button>
 
                       {/* Landlord */}
                       <button
                         type="button"
+                        disabled={authLoading}
                         onClick={() => setSelectedRole('landlord')}
                         className={`p-4 rounded-2xl border text-left flex sm:flex-col justify-between items-start cursor-pointer transition-all ${
                           selectedRole === 'landlord'
                             ? 'border-[#1E6B4A] bg-emerald-50/45 ring-2 ring-[#1E6B4A]'
                             : 'border-slate-200 bg-white hover:border-[#C9913A]'
-                        }`}
+                        } disabled:opacity-60`}
                       >
-                        <div className="space-y-1 sm:space-y-1.5">
-                          <Building className={`w-5 h-5 ${selectedRole === 'landlord' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <Building className={`w-6 h-6 mb-3 sm:block hidden ${selectedRole === 'landlord' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <div>
                           <span className="text-xs font-bold text-slate-800 block">Landlord</span>
-                          <span className="text-[10px] text-slate-400 hidden sm:block leading-snug">
-                            I have a property to list
-                          </span>
+                          <span className="text-[10px] text-slate-500 leading-tight block mt-0.5 sm:block hidden">Direct property owner listing rooms</span>
                         </div>
-                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center mt-3 ${
-                          selectedRole === 'landlord' ? 'bg-[#1E6B4A] border-transparent' : 'border-slate-350'
-                        }`}>
-                          {selectedRole === 'landlord' && <Check className="w-3 h-3 text-white" />}
-                        </div>
+                        <span className="text-xs sm:hidden font-semibold block text-[#C9913A]">Click Select</span>
                       </button>
 
                       {/* Agent */}
                       <button
                         type="button"
+                        disabled={authLoading}
                         onClick={() => setSelectedRole('agent')}
                         className={`p-4 rounded-2xl border text-left flex sm:flex-col justify-between items-start cursor-pointer transition-all ${
                           selectedRole === 'agent'
                             ? 'border-[#1E6B4A] bg-emerald-50/45 ring-2 ring-[#1E6B4A]'
                             : 'border-slate-200 bg-white hover:border-[#C9913A]'
-                        }`}
+                        } disabled:opacity-60`}
                       >
-                        <div className="space-y-1 sm:space-y-1.5">
-                          <Award className={`w-5 h-5 ${selectedRole === 'agent' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <Building2 className={`w-6 h-6 mb-3 sm:block hidden ${selectedRole === 'agent' ? 'text-[#1E6B4A]' : 'text-slate-400'}`} />
+                        <div>
                           <span className="text-xs font-bold text-slate-800 block">Agent</span>
-                          <span className="text-[10px] text-slate-400 hidden sm:block leading-snug">
-                            I manage multiple properties
-                          </span>
+                          <span className="text-[10px] text-slate-500 leading-tight block mt-0.5 sm:block hidden">Pre-verified realtor / coodinator manager</span>
                         </div>
-                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center mt-3 ${
-                          selectedRole === 'agent' ? 'bg-[#1E6B4A] border-transparent' : 'border-slate-350'
-                        }`}>
-                          {selectedRole === 'agent' && <Check className="w-3 h-3 text-white" />}
-                        </div>
+                        <span className="text-xs sm:hidden font-semibold block text-[#C9913A]">Click Select</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* DEMO ROW GRID FOR PERSONAL AND CONTACT DETAILS */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* FULL NAME */}
-                    <div>
-                      <label htmlFor="reg-fullname" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
-                        Full Name
-                      </label>
-                      <input
-                        id="reg-fullname"
-                        type="text"
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Mary Wanjiku"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400"
-                      />
-                    </div>
+                  {/* LEGAL FULL NAME */}
+                  <div>
+                    <label htmlFor="reg-name" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                      Legal Full Name <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      id="reg-name"
+                      type="text"
+                      required
+                      disabled={authLoading}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. Mary Wanjiku"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
+                    />
+                  </div>
 
-                    {/* PHONE NUMBER - MPESA REGISTERED */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* SAFARICOM M-PESA PHONE */}
                     <div>
                       <label htmlFor="reg-phone" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
-                        Phone Number
+                        M-Pesa Phone <span className="text-red-500 font-bold">*</span>
                       </label>
                       <div className="relative">
                         <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -763,190 +729,221 @@ export const SignUp: React.FC = () => {
                           id="reg-phone"
                           type="tel"
                           required
+                          disabled={authLoading}
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="e.g. 0712345678"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+
+                    {/* EMAIL ADDRESS */}
+                    <div>
+                      <label htmlFor="reg-email" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        Email Address <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          id="reg-email"
+                          type="email"
+                          required
+                          disabled={authLoading}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="e.g. mary@wanjiku.com"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* EMAIL */}
-                  <div>
-                    <label htmlFor="reg-email" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        id="reg-email"
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. mary@gmail.com"
-                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400"
-                      />
-                    </div>
-                  </div>
-
-                  {/* PASSWORD FIELDS GRID */}
+                  {/* PASSWORDS */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* PASSWORD */}
+                    {/* CHOSE PASSWORD */}
                     <div>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <label htmlFor="reg-password" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono">
-                          Password
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="text-xs text-[#1E6B4A] hover:underline font-bold"
-                        >
-                          {showPassword ? "Hide" : "Show"}
-                        </button>
-                      </div>
+                      <label htmlFor="reg-pass" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        Choose Password <span className="text-red-500 font-bold">*</span>
+                      </label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
-                          id="reg-password"
-                          type={showPassword ? "text" : "password"}
+                          id="reg-pass"
+                          type={showPassword ? 'text' : 'password'}
                           required
+                          disabled={authLoading}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-11 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
                         />
+                        <button
+                          type="button"
+                          disabled={authLoading}
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
                     </div>
 
                     {/* CONFIRM PASSWORD */}
                     <div>
                       <label htmlFor="reg-confirm" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
-                        Confirm Password
+                        Confirm Password <span className="text-red-500 font-bold">*</span>
                       </label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                           id="reg-confirm"
-                          type={showPassword ? "text" : "password"}
+                          type={showPassword ? 'text' : 'password'}
                           required
+                          disabled={authLoading}
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12 transition-all placeholder:text-slate-400"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-11 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
                         />
                       </div>
                     </div>
                   </div>
 
-                  {/* LIVE PASSWORD PARAMETER CHECKS METER */}
-                  <div className="bg-slate-50 rounded-2xl p-4.5 border border-slate-100 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10.5px] font-bold text-slate-700 font-bold">Password strength</span>
-                      <span className={`text-[10px] font-mono font-bold tracking-widest uppercase ${
-                        strengthScore === 100 ? 'text-[#1E6B4A]' : strengthScore > 40 ? 'text-amber-600' : 'text-red-500'
-                      }`}>
-                        {getStrengthText()}
-                      </span>
+                  {/* PASSWORD CRITERIA ASSESSMENT METERS */}
+                  <div className="space-y-3 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl">
+                    <div className="flex justify-between items-center text-xs font-semibold">
+                      <span className="text-slate-550">Keys Security Assessment:</span>
+                      <span className="font-mono text-[10px] uppercase font-bold text-[#C9913A]">{getStrengthText()}</span>
+                    </div>
+                    
+                    {/* ProgressBar */}
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div className={`h-full transition-all duration-350 ${getStrengthColor()}`} style={{ width: `${strengthScore}%` }} />
                     </div>
 
-                    {/* Progressive Bar */}
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-350 ${getStrengthColor()}`}
-                        style={{ width: `${strengthScore}%` }}
-                      />
-                    </div>
+                    {/* Check items */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${passCriteria.minLength ? 'bg-emerald-100 text-[#1E6B4A]' : 'bg-slate-200 text-slate-400'}`}>
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                        <span>At least 8 chars</span>
+                      </div>
 
-                    {/* Live parameter check capsules */}
-                    <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 pt-1.5 text-[10.5px]">
-                      <span className={`flex items-center gap-1 font-semibold ${passCriteria.minLength ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        <Check className={`w-3.5 h-3.5 ${passCriteria.minLength ? 'text-emerald-600' : 'text-transparent'}`} />
-                        8+ Characters
-                      </span>
-                      <span className={`flex items-center gap-1 font-semibold ${passCriteria.hasUpper ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        <Check className={`w-3.5 h-3.5 ${passCriteria.hasUpper ? 'text-emerald-600' : 'text-transparent'}`} />
-                        Uppercase (A-Z)
-                      </span>
-                      <span className={`flex items-center gap-1 font-semibold ${passCriteria.hasLower ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        <Check className={`w-3.5 h-3.5 ${passCriteria.hasLower ? 'text-emerald-600' : 'text-transparent'}`} />
-                        Lowercase (a-z)
-                      </span>
-                      <span className={`flex items-center gap-1 font-semibold ${passCriteria.hasNumber ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        <Check className={`w-3.5 h-3.5 ${passCriteria.hasNumber ? 'text-emerald-600' : 'text-transparent'}`} />
-                        Number (0-9)
-                      </span>
-                      <span className={`flex items-center gap-1 font-semibold ${passCriteria.hasSpecial ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        <Check className={`w-3.5 h-3.5 ${passCriteria.hasSpecial ? 'text-emerald-600' : 'text-transparent'}`} />
-                        Special Char
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${passCriteria.hasUpper ? 'bg-emerald-100 text-[#1E6B4A]' : 'bg-slate-200 text-slate-400'}`}>
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                        <span>Upper case (A-Z)</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${passCriteria.hasLower ? 'bg-emerald-100 text-[#1E6B4A]' : 'bg-slate-200 text-slate-400'}`}>
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                        <span>Lower case (a-z)</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${passCriteria.hasNumber ? 'bg-emerald-100 text-[#1E6B4A]' : 'bg-slate-200 text-slate-400'}`}>
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                        <span>Number (0-9)</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${passCriteria.hasSpecial ? 'bg-emerald-100 text-[#1E6B4A]' : 'bg-slate-200 text-slate-400'}`}>
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                        <span>Special symbol</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* DIRECTIVES CHECKBOX CLAUSES */}
-                  <div className="space-y-3 pt-2">
-                    <label className="flex items-start gap-3 cursor-pointer select-none text-slate-700">
+                  {/* COMPLIANCE CHECKBOXES */}
+                  <div className="space-y-3.5 pt-2">
+                    {/* Terms */}
+                    <label className="flex items-start gap-3 cursor-pointer text-slate-600 select-none">
                       <input
                         type="checkbox"
                         required
+                        disabled={authLoading}
                         checked={acceptedTerms}
                         onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="w-4.5 h-4.5 rounded text-[#1E6B4A] focus:ring-[#1E6B4A] accent-[#1E6B4A] shrink-0 mt-0.5"
+                        className="w-4 h-4 rounded-md border-slate-300 text-[#1E6B4A] focus:ring-[#1E6B4A] mt-0.5 accent-[#1E6B4A]"
                       />
-                      <span className="text-xs leading-normal">
-                        I accept the <a href="#terms" onClick={(e) => { e.preventDefault(); setShowTerms(true); }} className="text-[#1E6B4A] font-bold hover:underline">NestList Tenancy Terms</a> and Land Registry filing compliance requirements.
+                      <span className="text-xs font-semibold leading-relaxed">
+                        I hereby review and agree to the {' '}
+                        <button
+                          type="button"
+                          disabled={authLoading}
+                          onClick={() => setShowTerms(true)}
+                          className="text-[#1E6B4A] hover:text-[#155238] font-bold hover:underline outline-none"
+                        >
+                          Nestlist Tenancy Terms & Conditions
+                        </button>
                       </span>
                     </label>
 
-                    <label className="flex items-start gap-3 cursor-pointer select-none text-slate-700">
+                    {/* Privacy */}
+                    <label className="flex items-start gap-3 cursor-pointer text-slate-600 select-none">
                       <input
                         type="checkbox"
                         required
+                        disabled={authLoading}
                         checked={acceptedPrivacy}
                         onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                        className="w-4.5 h-4.5 rounded text-[#1E6B4A] focus:ring-[#1E6B4A] accent-[#1E6B4A] shrink-0 mt-0.5"
+                        className="w-4 h-4 rounded-md border-slate-300 text-[#1E6B4A] focus:ring-[#1E6B4A] mt-0.5 accent-[#1E6B4A]"
                       />
-                      <span className="text-xs leading-normal">
-                        I consent to the <a href="#privacy" onClick={(e) => { e.preventDefault(); setShowPrivacy(true); }} className="text-[#1E6B4A] font-bold hover:underline">Registry Privacy Act</a> and safe third-party database encryption.
+                      <span className="text-xs font-semibold leading-relaxed">
+                        I acknowledge receipt of the {' '}
+                        <button
+                          type="button"
+                          disabled={authLoading}
+                          onClick={() => setShowPrivacy(true)}
+                          className="text-[#1E6B4A] hover:text-[#155238] font-bold hover:underline outline-none"
+                        >
+                          Data Protection & Privacy Directives
+                        </button>
                       </span>
                     </label>
                   </div>
 
-                  {/* ACTION REGISTER BUTTON */}
+                  {/* SIGN UP SUBMIT BUTTON */}
                   <button
                     type="submit"
                     disabled={authLoading}
-                    className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                    className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {authLoading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                        <span>Engaging Secure Databases...</span>
+                        <span>Enrolling Member Profile...</span>
                       </>
                     ) : (
                       <>
-                        <UserPlus className="w-4.5 h-4.5" />
-                        <span>Create account</span>
+                        <UserPlus className="w-5 h-5" />
+                        <span>Create Account</span>
                       </>
                     )}
                   </button>
                 </form>
 
-                {/* Social Logins */}
-                <div className="space-y-4 pt-4 border-t border-slate-100 mt-6">
-                  <div className="relative flex justify-center text-xs">
+                {/* Social Sign-Up */}
+                <div className="space-y-4 pt-5 border-t border-slate-100 font-mono text-[9px]">
+                  <div className="relative flex justify-center text-xs font-mono text-[9px]">
                     <span className="bg-white px-3 text-slate-400 font-bold uppercase tracking-widest text-[9px]">
-                      Or sign up with
+                      Or Sign Up Securely With
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-3">
                     <button
                       type="button"
+                      disabled={authLoading}
                       onClick={() => handleSocialSignUp('Google')}
-                      className="flex items-center justify-center gap-2.5 h-11 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs font-bold text-slate-700 cursor-pointer active:scale-98 w-full"
+                      className="flex items-center justify-center gap-2.5 h-11 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-330 transition-all text-xs font-bold text-slate-705 cursor-pointer active:scale-98 w-full disabled:opacity-50"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6a5.64 5.64 0 0 1-2.44 3.7v3.08h3.93c2.3-2.1 3.65-5.2 3.65-8.6z" />
@@ -959,23 +956,24 @@ export const SignUp: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-slate-100 text-center text-xs text-slate-500 font-semibold">
+                <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500 font-semibold">
                   Already have an account?{' '}
-                  <Link to="/login" className="text-[#1E6B4A] hover:text-[#155238] hover:underline font-bold">
-                    Sign in
+                  <Link to="/login" className="text-[#1E6B4A] hover:text-[#155238] font-bold hover:underline">
+                    Sign in here
                   </Link>
                 </div>
               </>
             )}
+
           </div>
 
-          {/* SAAS COMPLIANCE EMBLEM */}
-          <div className="bg-[#E8F3ED] border border-emerald-550/10 rounded-3xl p-5 flex items-start gap-4">
-            <ShieldCheck className="w-5.5 h-5.5 text-[#1E6B4A] shrink-0 mt-0.5" />
+          {/* SAFE INFO BADGE */}
+          <div className="bg-[#E8F3ED] border border-emerald-500/10 rounded-3xl p-5 flex items-start gap-4 shadow-sm w-full max-w-lg mx-auto">
+            <ShieldCheck className="w-6 h-6 text-[#1E6B4A] shrink-0 mt-0.5" />
             <div className="space-y-1 text-left">
-              <span className="text-xs font-bold text-slate-800 block">Trusted throughout Kenya</span>
-              <p className="text-[11px] text-slate-600 leading-relaxed block">
-                Nestlist is trusted by landlords and tenants across Kenya.
+              <span className="text-xs font-bold text-slate-800 block">Complete end-to-end encryption</span>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                By creating a verified registry account, you agree to comply with the Nairobi Land Tenancy Directives. No broker commissions allowed.
               </p>
             </div>
           </div>
@@ -983,147 +981,132 @@ export const SignUp: React.FC = () => {
         </div>
       </div>
 
-      {/* TERMS OF SERVICE MODAL */}
+      {/* ─── MODAL: PREMIER TERMS & CONDITIONS ─── */}
       <AnimatePresence>
         {showTerms && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowTerms(false)}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px]"
-            />
-
-            {/* Modal Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.4 }}
-              className="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden max-h-[90vh] z-10 border border-slate-100"
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-[2rem] border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden"
             >
-              {/* Header */}
-              <div className="p-6 md:p-8 pb-4 border-b border-slate-100 flex justify-between items-start">
-                <div className="space-y-1 text-left">
-                  <h2 className="text-xl md:text-2.5xl font-serif text-[#1e6b4a] font-normal leading-tight">
-                    Nestlist Terms of Service
-                  </h2>
-                  <p className="text-xs text-slate-500 font-mono">
-                    Last updated: June 2026
-                  </p>
+              <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-[#1E6B4A] flex items-center justify-center shrink-0">
+                    <Scale className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-serif text-[#155238]">Nestlist Terms of Service</h3>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-0.5 font-bold">Revised Nairobi June 2026</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
+                <button 
                   onClick={() => setShowTerms(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all cursor-pointer"
-                  aria-label="Close"
+                  className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 flex items-center justify-center text-slate-50s hover:text-slate-700 transition-all outline-none"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Scrollable Body */}
-              <div className="p-6 md:p-8 pt-4 pb-4 flex-1 overflow-y-auto max-h-[70vh] space-y-5 text-left text-[14px] text-slate-600 leading-relaxed font-sans">
-                {termsSections.map((section, idx) => (
-                  <div key={idx} className="space-y-2">
-                    <h3 className="text-[16px] font-bold text-slate-950 flex items-start gap-1">
-                      <span className="text-[#1E6B4A] shrink-0 font-extrabold">{section.number}</span>
-                      <span>{section.title}</span>
-                    </h3>
-                    <div className="pl-0 sm:pl-3.5 text-[14px]">
-                      {section.content}
+              <div className="p-6 sm:p-8 overflow-y-auto space-y-6.5 text-[13px] text-slate-700 leading-relaxed font-sans">
+                {termsSections.map((sec, idx) => (
+                  <div key={idx} className="flex gap-4">
+                    <span className="font-mono font-bold text-[#C9913A] shrink-0 mt-0.5">{sec.number}</span>
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-slate-900 tracking-wide uppercase text-xs font-mono">{sec.title}</h4>
+                      <div className="text-slate-650 font-medium">{sec.content}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Footer */}
-              <div className="p-5 bg-slate-50 border-t border-slate-150 flex justify-end">
+              <div className="p-6 sm:p-8 border-t border-slate-100 flex justify-end gap-3.5 bg-slate-50">
                 <button
                   type="button"
-                  onClick={() => setShowTerms(false)}
-                  className="px-6 py-2.5 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:translate-y-[-1px] cursor-pointer active:scale-97"
+                  onClick={() => {
+                    setAcceptedTerms(true);
+                    setShowTerms(false);
+                    triggerToast('Tenancy Terms accepted!', 'success');
+                  }}
+                  className="px-6 py-2.5 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-xs transition-all shadow cursor-pointer"
                 >
-                  Close
+                  Accept Terms & Close
                 </button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* PRIVACY POLICY MODAL */}
+      {/* ─── MODAL: PRIVACY DIRECTIVES ─── */}
       <AnimatePresence>
         {showPrivacy && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowPrivacy(false)}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px]"
-            />
-
-            {/* Modal Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.4 }}
-              className="relative bg-white rounded-3xl shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden max-h-[90vh] z-10 border border-slate-100"
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-[2rem] border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden"
             >
-              {/* Header */}
-              <div className="p-6 md:p-8 pb-4 border-b border-slate-100 flex justify-between items-start">
-                <div className="space-y-1 text-left">
-                  <h2 className="text-xl md:text-2.5xl font-serif text-[#1e6b4a] font-normal leading-tight">
-                    Nestlist Privacy Policy
-                  </h2>
-                  <p className="text-xs text-slate-500 font-mono">
-                    Last updated: June 2026
-                  </p>
+              <div className="p-6 sm:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#C9913A]/10 text-[#C9913A] flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-serif text-[#1e6b4a]">Privacy & Data Policy</h3>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-0.5 font-bold">Compliant with Kenya DPA 2019</p>
+                  </div>
                 </div>
-                <button
-                  type="button"
+                <button 
                   onClick={() => setShowPrivacy(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all cursor-pointer"
-                  aria-label="Close"
+                  className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 flex items-center justify-center text-slate-50s hover:text-slate-700 transition-all outline-none"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Scrollable Body */}
-              <div className="p-6 md:p-8 pt-4 pb-4 flex-1 overflow-y-auto max-h-[70vh] space-y-5 text-left text-[14px] text-slate-600 leading-relaxed font-sans">
-                {privacySections.map((section, idx) => (
-                  <div key={idx} className="space-y-2">
-                    <h3 className="text-[16px] font-bold text-slate-950 flex items-start gap-1">
-                      <span className="text-[#1E6B4A] shrink-0 font-extrabold">{section.number}</span>
-                      <span>{section.title}</span>
-                    </h3>
-                    <div className="pl-0 sm:pl-3.5 text-[14px]">
-                      {section.content}
+              <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-[13px] text-slate-700 leading-relaxed font-sans">
+                {privacySections.map((sec, idx) => (
+                  <div key={idx} className="flex gap-4">
+                    <span className="font-mono font-bold text-[#C9913A] shrink-0 mt-0.5">{sec.number}</span>
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-slate-900 tracking-wide uppercase text-xs font-mono">{sec.title}</h4>
+                      <div className="text-slate-650 font-medium">{sec.content}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Footer */}
-              <div className="p-5 bg-slate-50 border-t border-slate-150 flex justify-end">
+              <div className="p-6 sm:p-8 border-t border-slate-100 flex justify-end gap-3.5 bg-slate-50">
                 <button
                   type="button"
-                  onClick={() => setShowPrivacy(false)}
-                  className="px-6 py-2.5 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-xs sm:text-sm tracking-wide transition-all shadow-md hover:shadow-lg hover:translate-y-[-1px] cursor-pointer active:scale-97"
+                  onClick={() => {
+                    setAcceptedPrivacy(true);
+                    setShowPrivacy(false);
+                    triggerToast('Data Policy accepted!', 'success');
+                  }}
+                  className="px-6 py-2.5 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-xs transition-all shadow cursor-pointer"
                 >
-                  Close
+                  Accept & Close
                 </button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

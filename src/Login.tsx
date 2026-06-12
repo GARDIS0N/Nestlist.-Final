@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useSignIn } from '@clerk/clerk-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LogIn, 
@@ -27,13 +28,35 @@ import {
   FileCheck
 } from 'lucide-react';
 
-export const Login: React.FC = () => {
-  const { user, profile, loading, signIn, signOut } = useAuth();
-  const navigate = useNavigate();
-  const isMockMode = false;
+const mapClerkError = (err: any): string => {
+  const errorMsg = err?.message || err?.errors?.[0]?.message || "";
+  const errCode = err?.errors?.[0]?.code || "";
+  
+  if (errCode === "form_password_incorrect" || errorMsg.toLowerCase().includes("password") || errorMsg.toLowerCase().includes("incorrect")) {
+    return "Incorrect password. Please try again.";
+  }
+  if (errCode === "form_identifier_not_found" || errorMsg.toLowerCase().includes("no account found") || errorMsg.toLowerCase().includes("not found")) {
+    return "No account found with this email.";
+  }
+  if (errCode === "form_identifier_exists" || errorMsg.toLowerCase().includes("already exists") || errorMsg.toLowerCase().includes("taken")) {
+    return "An account with this email already exists. Sign in instead.";
+  }
+  if (errCode === "verification_failed" || errorMsg.toLowerCase().includes("incorrect code") || errorMsg.toLowerCase().includes("invalid code")) {
+    return "Incorrect code. Please check your email and try again.";
+  }
+  if (errorMsg.toLowerCase().includes("expired") || errCode.includes("expired")) {
+    return "Code has expired. Click resend to get a new one.";
+  }
+  return errorMsg || "An error occurred. Please try again.";
+};
 
-  // Primary Views inside the Login container: "login", "forgot", "verification"
-  const [activeView, setActiveView] = useState<'login' | 'forgot' | 'verification'>('login');
+export const Login: React.FC = () => {
+  const { user, profile, loading } = useAuth();
+  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
+  const navigate = useNavigate();
+
+  // Primary Views inside the Login container: "login", "forgot", "verification", "reset-password"
+  const [activeView, setActiveView] = useState<'login' | 'forgot' | 'verification' | 'reset-password'>('login');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,15 +68,14 @@ export const Login: React.FC = () => {
   // Forgot password states
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState(false);
 
-  // Verification states
-  const [verifyingEmail, setVerifyingEmail] = useState('');
-  const [timerCount, setTimerCount] = useState(0);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const [verificationFeedback, setVerificationFeedback] = useState<string | null>(null);
+  // Reset password states
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
-  // Focus ref
+  // Focus refs
   const emailInputRef = useRef<HTMLInputElement>(null);
   const forgotInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,16 +97,6 @@ export const Login: React.FC = () => {
       forgotInputRef.current.focus();
     }
   }, [activeView]);
-
-  // Handle countdown timer for email verification resend
-  useEffect(() => {
-    if (timerCount > 0) {
-      const interval = setInterval(() => {
-        setTimerCount((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [timerCount]);
 
   // Load remembered email
   useEffect(() => {
@@ -122,25 +134,42 @@ export const Login: React.FC = () => {
     setAuthLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
-
-      if (error) {
-        throw error;
+      if (!isSignInLoaded || !signIn) {
+        throw new Error("Clerk authentication is loading. Please reload the page.");
       }
 
-      if (rememberMe) {
-        localStorage.setItem('nestlist_remembered_email', email);
+      const cleanEmail = email.trim().toLowerCase();
+
+      // Initiate login
+      await signIn.create({
+        identifier: cleanEmail,
+        password: password,
+      });
+
+      // Confirm Factor
+      const completeSignIn = await signIn.attemptFirstFactor({
+        strategy: "password",
+        password: password,
+      });
+
+      if (completeSignIn.status === "complete") {
+        if (rememberMe) {
+          localStorage.setItem('nestlist_remembered_email', email);
+          localStorage.setItem('nestlist_remember_me', 'true');
+        } else {
+          localStorage.removeItem('nestlist_remembered_email');
+          localStorage.setItem('nestlist_remember_me', 'false');
+        }
+
+        await setActive({ session: completeSignIn.createdSessionId });
+        triggerToast("Welcome back!", "success");
+        navigate("/dashboard", { replace: true });
       } else {
-        localStorage.removeItem('nestlist_remembered_email');
+        throw new Error("Login status incomplete. Secondary factors required.");
       }
     } catch (err: any) {
       console.error('Login request failed:', err);
-      // Beautiful friendly error messages
-      if (err.message?.includes('Invalid login credentials') || err.message?.includes('invalid_credentials') || err.message?.includes('password') || err.message?.includes('incorrect')) {
-        setErrorMessage('Invalid credentials. Please double-check your email and password.');
-      } else {
-        setErrorMessage(err.message || 'Verification rejected. Please check connection settings.');
-      }
+      setErrorMessage(mapClerkError(err));
       triggerToast('Authentication failed', 'error');
     } finally {
       setAuthLoading(false);
@@ -153,19 +182,18 @@ export const Login: React.FC = () => {
         setAuthLoading(true);
         triggerToast(`Connecting to your Google Account safely...`, 'info');
         
-        // Dynamic simulated sign-in for Demo/QA - logs in instantly as a verified google user
-        setTimeout(async () => {
-          const res = await signIn('tenant@nestlist.ke', 'password');
-          setAuthLoading(false);
-          if (!res.error) {
-            triggerToast(`Successfully authenticated as Google User!`, 'success');
-          } else {
-            setErrorMessage(res.error.message || "Failed to log in with Google.");
-          }
-        }, 1200);
+        // Let's set a default role in pending store just in case they sign in as new google user
+        localStorage.setItem("nestlist_oauth_pending_role", "tenant");
+        localStorage.setItem("nestlist_remember_me", rememberMe ? "true" : "false");
+
+        await signIn?.authenticateWithRedirect({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: "/dashboard",
+        });
       } catch (err: any) {
         console.error("Google Sign-In failed:", err);
-        setErrorMessage(err.message || "Failed to initialize social sign-in.");
+        setErrorMessage(mapClerkError(err));
         triggerToast("Google OAuth failed", "error");
         setAuthLoading(false);
       }
@@ -184,50 +212,71 @@ export const Login: React.FC = () => {
     setForgotLoading(true);
 
     try {
-      // Simulated password reset recovery dispatch sequence
-      setTimeout(() => {
-        setForgotSuccess(true);
-        setForgotLoading(false);
-        triggerToast('Password reset instructions have been dispatched to your email.', 'success');
-      }, 1000);
+      if (!signIn) throw new Error("Authentication module is not loaded.");
+
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: forgotEmail,
+      });
+
+      setActiveView('reset-password');
+      triggerToast('Verification instructions have been dispatched to your email.', 'success');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Reset dispatch failed.');
+      console.error("Forgot password failure:", err);
+      setErrorMessage(mapClerkError(err));
       triggerToast('Dispatch failed', 'error');
+    } finally {
       setForgotLoading(false);
     }
   };
 
-  const handleResendVerification = async () => {
-    if (timerCount > 0) return;
-    setVerificationLoading(true);
-    setVerificationFeedback(null);
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
 
-    try {
-      setTimerCount(60);
-      setVerificationFeedback('📩 Resend successful! If your email address is registered, please check your mailbox for verification sequences.');
-      triggerToast('Link dispatched.', 'success');
-    } catch (err: any) {
-      setVerificationFeedback(`❌ Send failed: ${err.message}`);
-      triggerToast('Send failed', 'error');
-    } finally {
-      setVerificationLoading(false);
+    if (!resetCode) {
+      setErrorMessage("Please enter the verification code sent to your email.");
+      return;
     }
-  };
+    if (newPassword.length < 8) {
+      setErrorMessage("New password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMessage("Passwords do not match. Please verify.");
+      return;
+    }
 
-  const handleSkipVerification = async () => {
-    // Helpful testing bypass in case user wants to test quickly in AI Studio preview
-    triggerToast('Bypassing verification step in demo sandbox mode...', 'info');
-    localStorage.setItem("nestlist_offline_mode", "true");
-    
-    // Auto-login inside sandbox with verifying email
-    setAuthLoading(true);
+    setResetLoading(true);
+
     try {
-      await signIn(verifyingEmail || 'tenant@nestlist.ke', 'password');
-    } catch (e) {
-      // Create user if not existing
-      await signIn('tenant@nestlist.ke', 'password');
+      if (!signIn) throw new Error("Authentication module is not loaded.");
+
+      const completeSignIn = await signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: resetCode,
+        password: newPassword,
+      });
+
+      if (completeSignIn.status === "complete") {
+        if (rememberMe) {
+          localStorage.setItem('nestlist_remember_me', 'true');
+        } else {
+          localStorage.setItem('nestlist_remember_me', 'false');
+        }
+
+        await setActive({ session: completeSignIn.createdSessionId });
+        triggerToast("Password reset successfully!", "success");
+        navigate("/dashboard", { replace: true });
+      } else {
+        throw new Error("Secondary factors or parameters requested.");
+      }
+    } catch (err: any) {
+      console.error("Password reset failure:", err);
+      setErrorMessage(mapClerkError(err));
+      triggerToast("Update rejected", "error");
     } finally {
-      setAuthLoading(false);
+      setResetLoading(false);
     }
   };
 
@@ -423,53 +472,6 @@ export const Login: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Sandbox helper instructions */}
-                  {isMockMode && (
-                    <div className="bg-amber-50/75 border border-amber-500/10 rounded-2xl p-4 text-left relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-12 h-12 bg-amber-400/5 rounded-bl-3xl" />
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-[#C9913A] text-white text-[10px] font-bold">✨</span>
-                        <span className="text-xs font-bold text-[#C9913A] uppercase tracking-wide">Demo Sandbox Account Presets</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed mb-3">
-                        Using offline environment modes. Click any credentials capsule below to fill form immediately:
-                      </p>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmail('tenant@nestlist.ke');
-                            setPassword('password');
-                          }}
-                          className="px-3 py-1.5 bg-white rounded-xl border border-[#cbd5e1] hover:border-[#C9913A] hover:bg-amber-50/20 text-slate-700 text-[10.5px] font-bold cursor-pointer transition-all active:scale-95"
-                        >
-                          🏚️ Tenant
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmail('landlord@nestlist.ke');
-                            setPassword('password');
-                          }}
-                          className="px-3 py-1.5 bg-white rounded-xl border border-[#cbd5e1] hover:border-[#C9913A] hover:bg-amber-50/20 text-slate-700 text-[10.5px] font-bold cursor-pointer transition-all active:scale-95"
-                        >
-                          🏢 Landlord
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmail('admin@nestlist.ke');
-                            setPassword('password');
-                          }}
-                          className="px-3 py-1.5 bg-white rounded-xl border border-[#cbd5e1] hover:border-[#C9913A] hover:bg-amber-50/20 text-slate-700 text-[10.5px] font-bold cursor-pointer transition-all active:scale-95"
-                        >
-                          🛡️ System Admin
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Errors Banner */}
                   {errorMessage && (
                     <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs leading-normal flex items-start gap-2.5">
@@ -492,10 +494,11 @@ export const Login: React.FC = () => {
                           ref={emailInputRef}
                           type="email"
                           required
+                          disabled={authLoading}
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="e.g. juma@nestlist.ke"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none transition-all placeholder:text-slate-400 h-12"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
                         />
                       </div>
                     </div>
@@ -508,8 +511,9 @@ export const Login: React.FC = () => {
                         </label>
                         <button
                           type="button"
+                          disabled={authLoading}
                           onClick={() => setActiveView('forgot')}
-                          className="text-xs text-[#C9913A] hover:text-[#1E6B4A] font-bold hover:underline"
+                          className="text-xs text-[#C9913A] hover:text-[#1E6B4A] font-bold hover:underline disabled:opacity-50"
                         >
                           Forgot Password?
                         </button>
@@ -520,13 +524,15 @@ export const Login: React.FC = () => {
                           id="login-password"
                           type={showPassword ? "text" : "password"}
                           required
+                          disabled={authLoading}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-11 py-3 outline-none transition-all placeholder:text-slate-400 h-12"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-11 py-3 outline-none transition-all placeholder:text-slate-400 h-12 disabled:opacity-60"
                         />
                         <button
                           type="button"
+                          disabled={authLoading}
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-450 hover:text-slate-700 outline-none"
                         >
@@ -540,9 +546,10 @@ export const Login: React.FC = () => {
                       <label className="flex items-center gap-2.5 cursor-pointer text-slate-600 select-none">
                         <input
                           type="checkbox"
+                          disabled={authLoading}
                           checked={rememberMe}
                           onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded-md border-slate-300 text-[#1E6B4A] focus:ring-[#1E6B4A] accent-[#1E6B4A]"
+                          className="w-4 h-4 rounded-md border-slate-300 text-[#1E6B4A] focus:ring-[#1E6B4A] accent-[#1E6B4A] disabled:opacity-70"
                         />
                         <span className="text-xs font-semibold">Remember me</span>
                       </label>
@@ -553,7 +560,7 @@ export const Login: React.FC = () => {
                       id="login-submit-btn"
                       type="submit"
                       disabled={authLoading}
-                      className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] active:bg-[#0f3d2a] text-white font-bold rounded-xl text-sm transition-all shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] active:bg-[#0f3d2a] text-white font-bold rounded-xl text-sm transition-all shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
                       {authLoading ? (
                         <>
@@ -580,8 +587,9 @@ export const Login: React.FC = () => {
                     <div className="flex flex-col gap-3">
                       <button
                         type="button"
+                        disabled={authLoading}
                         onClick={() => handleSocialLogin('Google')}
-                        className="flex items-center justify-center gap-2.5 h-11 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs font-bold text-slate-705 cursor-pointer active:scale-98 w-full"
+                        className="flex items-center justify-center gap-2.5 h-11 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs font-bold text-slate-705 cursor-pointer active:scale-98 w-full disabled:opacity-50"
                       >
                         <svg className="w-4 h-4" viewBox="0 0 24 24">
                           <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6a5.64 5.64 0 0 1-2.44 3.7v3.08h3.93c2.3-2.1 3.65-5.2 3.65-8.6z" />
@@ -618,21 +626,21 @@ export const Login: React.FC = () => {
                   <div className="space-y-2">
                     <button
                       type="button"
+                      disabled={forgotLoading}
                       onClick={() => {
                         setActiveView('login');
-                        setForgotSuccess(false);
                         setErrorMessage(null);
                       }}
-                      className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-bold outline-none"
+                      className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-bold outline-none disabled:opacity-50"
                     >
                       ← Return to sign in
                     </button>
                     
                     <h2 className="text-2.5xl font-serif text-[#1e6b4a] font-normal leading-tight">
-                      Restore Key Keyway
+                      Restore Key Way
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Input your registered email. We will dispatch secure credentials restoration protocols immediately.
+                      Input your registered email. We will dispatch secure credentials restoration code immediately.
                     </p>
                   </div>
 
@@ -643,146 +651,155 @@ export const Login: React.FC = () => {
                     </div>
                   )}
 
-                  {!forgotSuccess ? (
-                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
-                      <div>
-                        <label htmlFor="forgot-email" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
-                          Account Email
-                        </label>
-                        <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input
-                            id="forgot-email"
-                            ref={forgotInputRef}
-                            type="email"
-                            required
-                            value={forgotEmail}
-                            onChange={(e) => setForgotEmail(e.target.value)}
-                            placeholder="e.g. user@nestlist.ke"
-                            className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12"
-                          />
-                        </div>
+                  <form onSubmit={handleForgotPasswordSubmit} className="space-y-5">
+                    <div>
+                      <label htmlFor="forgot-email" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        Account Email
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          id="forgot-email"
+                          ref={forgotInputRef}
+                          type="email"
+                          required
+                          disabled={forgotLoading}
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          placeholder="e.g. user@nestlist.ke"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 outline-none h-12 disabled:opacity-60"
+                        />
                       </div>
-
-                      <button
-                        type="submit"
-                        disabled={forgotLoading}
-                        className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {forgotLoading ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                            <span>Verifying Profile...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4.5 h-4.5" />
-                            <span>Dispatch Recovery Instructions</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="bg-emerald-50/50 border border-emerald-500/10 rounded-2xl p-6 text-center space-y-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-100 text-[#1E6B4A]">
-                        <FileCheck className="w-7 h-7" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-bold text-slate-800">Verification Link Routed</h4>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          We have routed standard credential reset packages directly to <strong>{forgotEmail}</strong>. Please investigate both inbox and junk folders.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveView('login');
-                          setForgotSuccess(false);
-                        }}
-                        className="text-xs text-[#1E6B4A] hover:text-[#155238] font-bold hover:underline block mx-auto pt-2"
-                      >
-                        Back to secure login
-                      </button>
                     </div>
-                  )}
+
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {forgotLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          <span>Verifying Profile...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4.5 h-4.5" />
+                          <span>Dispatch Recovery Instructions</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
                 </motion.div>
               )}
 
               {/* ─────────────────────────────────────────
-                  VIEW: EMAIL VERIFICATION
+                  VIEW: RESET PASSWORD
                   ───────────────────────────────────────── */}
-              {activeView === 'verification' && (
+              {activeView === 'reset-password' && (
                 <motion.div
-                  key="verification-view"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
+                  key="reset-password-view"
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
                   transition={{ duration: 0.25 }}
                   className="space-y-6"
                 >
                   <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={resetLoading}
+                      onClick={() => {
+                        setActiveView('login');
+                        setErrorMessage(null);
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-bold outline-none disabled:opacity-50"
+                    >
+                      ← Return to sign in
+                    </button>
+                    
                     <h2 className="text-2.5xl font-serif text-[#1e6b4a] font-normal leading-tight">
-                      Confirm Integrity
+                      Reset Password
                     </h2>
                     <p className="text-xs text-slate-500">
-                      A security verification key has been routed to <strong>{verifyingEmail}</strong>. Secure activation is required before rental directory navigation access.
+                      Please enter the code sent to your email and your new secure password.
                     </p>
                   </div>
 
-                  {verificationFeedback && (
-                    <div className="p-3.5 bg-sky-50 border border-sky-100 rounded-xl text-sky-950 text-xs leading-normal">
-                      {verificationFeedback}
+                  {errorMessage && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs leading-normal flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <span>{errorMessage}</span>
                     </div>
                   )}
 
-                  <div className="space-y-4">
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-center space-y-3.5">
-                      <Compass className="w-10 h-10 text-[#C9913A] mx-auto animate-spin-slow" />
-                      
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-slate-800 block">Pending verification check</span>
-                        <p className="text-[11px] text-slate-500">
-                          Please tap the activation button inside that email. Then sign in again.
-                        </p>
-                      </div>
+                  <form onSubmit={handleResetPasswordSubmit} className="space-y-4.5">
+                    {/* RESET CODE */}
+                    <div>
+                      <label htmlFor="reset-code" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        Reset Verification Code
+                      </label>
+                      <input
+                        id="reset-code"
+                        type="text"
+                        required
+                        disabled={resetLoading}
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value)}
+                        placeholder="e.g. 123456"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl px-4 py-3 h-12 outline-none disabled:opacity-60"
+                      />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <button
-                        type="button"
-                        onClick={handleResendVerification}
-                        disabled={timerCount > 0 || verificationLoading}
-                        className="w-full h-11 border border-slate-205 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all text-slate-700 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
-                      >
-                        {verificationLoading ? (
-                          <span>Dispatching...</span>
-                        ) : timerCount > 0 ? (
-                          <span>Resend in {timerCount}s</span>
-                        ) : (
-                          <span>Resend Email</span>
-                        )}
-                      </button>
+                    {/* NEW PASSWORD */}
+                    <div>
+                      <label htmlFor="new-password" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        New Password
+                      </label>
+                      <input
+                        id="new-password"
+                        type="password"
+                        required
+                        disabled={resetLoading}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl px-4 py-3 h-12 outline-none disabled:opacity-60"
+                      />
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={handleSkipVerification}
-                        className="w-full h-11 bg-[#C9913A]/10 border border-[#C9913A]/20 hover:bg-[#C9913A]/20 rounded-xl text-xs font-bold text-[#C9913A] transition-all cursor-pointer flex items-center justify-center"
-                      >
-                        Bypass (Sandbox Mode)
-                      </button>
+                    {/* CONFIRM NEW PASSWORD */}
+                    <div>
+                      <label htmlFor="confirm-new-password" className="block text-[10px] font-bold text-[#155238] uppercase tracking-widest font-mono mb-1.5">
+                        Confirm New Password
+                      </label>
+                      <input
+                        id="confirm-new-password"
+                        type="password"
+                        required
+                        disabled={resetLoading}
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl px-4 py-3 h-12 outline-none disabled:opacity-60"
+                      />
                     </div>
 
                     <button
-                      type="button"
-                      onClick={() => {
-                        signOut();
-                        setActiveView('login');
-                      }}
-                      className="text-xs text-slate-500 hover:text-slate-800 hover:underline block mx-auto text-center pt-2 font-bold cursor-pointer"
+                      type="submit"
+                      disabled={resetLoading}
+                      className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
-                      ← Back to Secure Login
+                      {resetLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          <span>Updating Password...</span>
+                        </>
+                      ) : (
+                        <span>Verify and Submit</span>
+                      )}
                     </button>
-                  </div>
+                  </form>
                 </motion.div>
               )}
 

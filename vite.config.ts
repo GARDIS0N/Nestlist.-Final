@@ -12,9 +12,18 @@ export default defineConfig(() => {
       },
     },
     server: {
-      hmr: false,
       host: true,
-      port: 3000,
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+        },
+        '/uploads': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+        },
+      },
       watch: {
         ignored: [
           '**/src/data/**',
@@ -22,6 +31,9 @@ export default defineConfig(() => {
           '**/database.json'
         ]
       }
+    },
+    build: {
+      outDir: 'dist/public',
     },
   };
 });
