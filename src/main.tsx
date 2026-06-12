@@ -1,17 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ClerkProvider, AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ProtectedRoute } from './ProtectedRoute';
 import { Login } from './Login';
 import { SignUp } from './SignUp';
 import App from './App';
 import './index.css';
-
-const CLERK_PUBLISHABLE_KEY = (import.meta as any).env.VITE_CLERK_PUBLISHABLE_KEY || 
-  (typeof process !== 'undefined' && process.env ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY : undefined) || 
-  "pk_test_YmFsYW5jZWQtZWxmLTU5LmNsZXJrLmFjY291bnRzLmRldiQ";
 
 // Helper component to redirect authenticated users based on their custom profiles
 const HomeRedirect = () => {
@@ -60,16 +55,14 @@ const HomeRedirect = () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public Auth Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
 
-            {/* Protected Application Routes */}
+          {/* Protected Application Routes */}
             <Route 
               path="/browse" 
               element={
@@ -93,6 +86,5 @@ createRoot(document.getElementById('root')!).render(
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-    </ClerkProvider>
   </StrictMode>,
 );
