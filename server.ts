@@ -282,6 +282,74 @@ app.post("/api/set-role", async (req, res) => {
   }
 });
 
+app.post("/api/auth/clerk-sync", async (req, res) => {
+  const { userId, email, name, role, phone } = req.body;
+  if (!userId || !email) {
+    return res.status(400).json({ success: false, error: "Missing userId or email parameters" });
+  }
+
+  let user: any;
+  if (isSupabaseActive()) {
+    try {
+      const users = await dbService.getUsers();
+      user = users.find((u: any) => u.clerkId === userId || u.email.toLowerCase() === email.toLowerCase());
+      if (!user) {
+        user = {
+          id: userId,
+          email: email.toLowerCase(),
+          name: name || email.split("@")[0],
+          role: role || "Tenant",
+          phone: phone || "",
+          clerkId: userId,
+          isVerified: true,
+          favorites: [],
+          createdAt: new Date().toISOString()
+        };
+        await dbService.createUser(user);
+      } else if (!user.clerkId) {
+        user.clerkId = userId;
+        await dbService.updateUser(user.id, { clerkId: userId });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  } else {
+    const db = loadDB();
+    user = db.users.find((u: any) => u.clerkId === userId || u.email.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      user = {
+        id: userId,
+        email: email.toLowerCase(),
+        name: name || email.split("@")[0],
+        role: role || "Tenant",
+        phone: phone || "",
+        clerkId: userId,
+        isVerified: true,
+        favorites: [],
+        createdAt: new Date().toISOString()
+      };
+      db.users.push(user);
+      saveDB(db);
+    } else if (!user.clerkId) {
+      user.clerkId = userId;
+      saveDB(db);
+    }
+  }
+
+  const token = createToken(user);
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      phone: user.phone
+    }
+  });
+});
+
 // User Registration Router
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, name, role, phone } = req.body;
@@ -2074,15 +2142,31 @@ app.post("/api/reports", authenticateToken, async (req: any, res) => {
 });
 
 
-// Serve static assets from the public dist folder in production (Bug 5)
-const distPath = path.join(process.cwd(), "dist", "public");
-app.use(express.static(distPath));
+// Serve static assets or use Vite middleware depending on mode wrapped in async bootstrap
+async function bootstrap() {
+  if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    // Serve static assets from the public dist folder in production
+    const distPath = path.join(process.cwd(), "dist", "public");
+    app.use(express.static(distPath));
 
-// Support React Router: Send index.html inside dist/public for all other non-API routes
-app.get("*", (req: any, res: any) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
+    // Support React Router: Send index.html inside dist/public for all other non-API routes
+    app.get("*", (req: any, res: any) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 NESTLIST PLATFORM server running on http://localhost:${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 NESTLIST PLATFORM server running on http://localhost:${PORT}`);
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error("Failed to bootstrap Nestlist server:", err);
 });

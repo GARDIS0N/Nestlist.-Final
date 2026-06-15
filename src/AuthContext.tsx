@@ -106,6 +106,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const email = clerkUser.primaryEmailAddress?.emailAddress || "";
+
+        // Always sync Clerk user profile to our backend to retrieve/create their JWT ('nestlist_token')
+        try {
+          const syncBackendRes = await fetch(getApiUrl("/api/auth/clerk-sync"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: clerkUser.id,
+              email: email,
+              name: clerkUser.fullName || email.split("@")[0],
+              role: clerkRole || "tenant",
+              phone: clerkPhone || "",
+            }),
+          });
+          if (syncBackendRes.ok) {
+            const syncData = await syncBackendRes.json();
+            if (syncData.success && syncData.token) {
+              localStorage.setItem("nestlist_token", syncData.token);
+              localStorage.setItem("nestlist_user", JSON.stringify(syncData.user));
+            }
+          }
+        } catch (backendSyncErr) {
+          console.error("Failed to retrieve backend JWT token for Clerk user:", backendSyncErr);
+        }
+
         const u = {
           id: clerkUser.id,
           email: email,
@@ -141,8 +166,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(u);
         setProfile(p);
       } else {
-        setUser(null);
-        setProfile(null);
+        // Fallback for custom / demo non-Clerk accounts
+        const localToken = localStorage.getItem("nestlist_token");
+        const localUserStr = localStorage.getItem("nestlist_user");
+
+        if (localToken && localUserStr) {
+          try {
+            const decodedUser = JSON.parse(localUserStr);
+            setUser({
+              id: decodedUser.id,
+              email: decodedUser.email,
+              email_confirmed_at: new Date().toISOString()
+            });
+            setProfile({
+              id: decodedUser.id,
+              full_name: decodedUser.name,
+              phone: decodedUser.phone || null,
+              role: mapBackendRoleToAppRole(decodedUser.role),
+              created_at: decodedUser.createdAt || new Date().toISOString(),
+              email: decodedUser.email,
+              avatarUrl: decodedUser.avatarUrl || "",
+              bio: decodedUser.bio || "",
+              location: decodedUser.location || "Nairobi, Kenya"
+            });
+          } catch (e) {
+            localStorage.removeItem("nestlist_token");
+            localStorage.removeItem("nestlist_user");
+            setUser(null);
+            setProfile(null);
+          }
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
       }
       setLoading(false);
     };
@@ -159,17 +215,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      const cleanEmail = email.trim().toLowerCase();
+      const isDemoDomain = cleanEmail.endsWith("@nestlist.ke") || cleanEmail.endsWith("@nestlist.com");
+
+      if (isDemoDomain) {
+        // Direct local login for demo/testing accounts
+        const response = await fetch(getApiUrl("/api/auth/login"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password: password }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          localStorage.setItem("nestlist_token", data.token);
+          localStorage.setItem("nestlist_user", JSON.stringify(data.user));
+          
+          const u = {
+            id: data.user.id,
+            email: data.user.email,
+            email_confirmed_at: new Date().toISOString()
+          };
+          const p: Profile = {
+            id: data.user.id,
+            full_name: data.user.name,
+            phone: data.user.phone || null,
+            role: mapBackendRoleToAppRole(data.user.role),
+            created_at: data.user.createdAt || new Date().toISOString(),
+            email: data.user.email,
+            avatarUrl: data.user.avatarUrl || "",
+            bio: data.user.bio || "",
+            location: data.user.location || "Nairobi, Kenya"
+          };
+          
+          setUser(u);
+          setProfile(p);
+          sessionStorage.setItem("nestlist_session_active", "true");
+          
+          return { user: u, profile: p, error: null };
+        } else {
+          return { user: null, profile: null, error: new Error(data.error || "Invalid credentials") };
+        }
+      }
+
       if (!isSignInLoaded || !clerkSignIn) {
         throw new Error("Clerk authentication is loading. Please reload the page.");
       }
 
-      const cleanEmail = email.trim().toLowerCase();
-
       // Submit identification parameters
-      await clerkSignIn.create({
+      const result = await clerkSignIn.create({
         identifier: cleanEmail,
         password: password,
       });
+
+      if (result.status === "complete") {
+        await setSignInActive({ session: result.createdSessionId });
+        return { user: { id: result.createdSessionId, email: cleanEmail }, profile: null, error: null };
+      }
 
       // Complete login factor
       const completeSignIn = await clerkSignIn.attemptFirstFactor({

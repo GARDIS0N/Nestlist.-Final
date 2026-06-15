@@ -51,12 +51,12 @@ const mapClerkError = (err: any): string => {
 };
 
 export const Login: React.FC = () => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, signIn: contextSignIn } = useAuth();
   const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
   const navigate = useNavigate();
 
-  // Primary Views inside the Login container: "login", "forgot", "verification", "reset-password"
-  const [activeView, setActiveView] = useState<'login' | 'forgot' | 'verification' | 'reset-password'>('login');
+  // Primary Views inside the Login container: "login", "forgot", "verification", "reset-password", "mfa"
+  const [activeView, setActiveView] = useState<'login' | 'forgot' | 'verification' | 'reset-password' | 'mfa'>('login');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,6 +74,11 @@ export const Login: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
+
+  // MFA / Double-Factor verification states
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaStrategy, setMfaStrategy] = useState<string>('email_code');
 
   // Focus refs
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -134,25 +139,16 @@ export const Login: React.FC = () => {
     setAuthLoading(true);
 
     try {
-      if (!isSignInLoaded || !signIn) {
-        throw new Error("Clerk authentication is loading. Please reload the page.");
-      }
-
       const cleanEmail = email.trim().toLowerCase();
+      const isDemoDomain = cleanEmail.endsWith("@nestlist.ke") || cleanEmail.endsWith("@nestlist.com");
 
-      // Initiate login
-      await signIn.create({
-        identifier: cleanEmail,
-        password: password,
-      });
+      if (isDemoDomain) {
+        // Direct local login for demo/testing accounts under the hood
+        const res = await contextSignIn(cleanEmail, password);
+        if (res.error) {
+          throw res.error;
+        }
 
-      // Confirm Factor
-      const completeSignIn = await signIn.attemptFirstFactor({
-        strategy: "password",
-        password: password,
-      });
-
-      if (completeSignIn.status === "complete") {
         if (rememberMe) {
           localStorage.setItem('nestlist_remembered_email', email);
           localStorage.setItem('nestlist_remember_me', 'true');
@@ -161,11 +157,94 @@ export const Login: React.FC = () => {
           localStorage.setItem('nestlist_remember_me', 'false');
         }
 
-        await setActive({ session: completeSignIn.createdSessionId });
+        triggerToast("Welcome back (Demo Account)!", "success");
+        // Navigation is handled automatically by the redirect effect waiting on user/profile,
+        // or we can redirect immediately
+        const targetRole = res.profile?.role || "tenant";
+        if (targetRole === "landlord" || targetRole === "admin") {
+          navigate("/dashboard", { replace: true });
+        } else {
+          navigate("/browse", { replace: true });
+        }
+        return;
+      }
+
+      if (!isSignInLoaded || !signIn) {
+        throw new Error("Clerk authentication is loading. Please reload the page.");
+      }
+
+      // Initiate login
+      const result = await signIn.create({
+        identifier: cleanEmail,
+        password: password,
+      });
+
+      if (result.status === "complete") {
+        if (rememberMe) {
+          localStorage.setItem('nestlist_remembered_email', email);
+          localStorage.setItem('nestlist_remember_me', 'true');
+        } else {
+          localStorage.removeItem('nestlist_remembered_email');
+          localStorage.setItem('nestlist_remember_me', 'false');
+        }
+
+        await setActive({ session: result.createdSessionId });
         triggerToast("Welcome back!", "success");
         navigate("/dashboard", { replace: true });
+      } else if (result.status === "needs_second_factor") {
+        const targetFactor = result.supportedSecondFactors?.find(
+          (f: any) => f.strategy === "phone_code" || f.strategy === "email_code"
+        );
+        if (targetFactor) {
+          triggerToast("Preparing dual-factor security code...", "info");
+          await signIn.prepareSecondFactor({ strategy: targetFactor.strategy as any });
+          setMfaStrategy(targetFactor.strategy);
+        } else {
+          const firstFactor = result.supportedSecondFactors?.[0];
+          if (firstFactor) {
+            setMfaStrategy(firstFactor.strategy);
+          }
+        }
+        setActiveView('mfa');
+        triggerToast("Multi-Factor verification required.", "info");
       } else {
-        throw new Error("Login status incomplete. Secondary factors required.");
+        // Confirm Factor if needed
+        const completeSignIn = await signIn.attemptFirstFactor({
+          strategy: "password",
+          password: password,
+        });
+
+        if (completeSignIn.status === "complete") {
+          if (rememberMe) {
+            localStorage.setItem('nestlist_remembered_email', email);
+            localStorage.setItem('nestlist_remember_me', 'true');
+          } else {
+            localStorage.removeItem('nestlist_remembered_email');
+            localStorage.setItem('nestlist_remember_me', 'false');
+          }
+
+          await setActive({ session: completeSignIn.createdSessionId });
+          triggerToast("Welcome back!", "success");
+          navigate("/dashboard", { replace: true });
+        } else if (completeSignIn.status === "needs_second_factor") {
+          const targetFactor = completeSignIn.supportedSecondFactors?.find(
+            (f: any) => f.strategy === "phone_code" || f.strategy === "email_code"
+          );
+          if (targetFactor) {
+            triggerToast("Preparing dual-factor security code...", "info");
+            await signIn.prepareSecondFactor({ strategy: targetFactor.strategy as any });
+            setMfaStrategy(targetFactor.strategy);
+          } else {
+            const firstFactor = completeSignIn.supportedSecondFactors?.[0];
+            if (firstFactor) {
+              setMfaStrategy(firstFactor.strategy);
+            }
+          }
+          setActiveView('mfa');
+          triggerToast("Multi-Factor verification code sent. Please check your phone/email.", "info");
+        } else {
+          throw new Error("Login status incomplete. Secondary factors required.");
+        }
       }
     } catch (err: any) {
       console.error('Login request failed:', err);
@@ -277,6 +356,47 @@ export const Login: React.FC = () => {
       triggerToast("Update rejected", "error");
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaCode) {
+      setErrorMessage("Please enter your verification code.");
+      return;
+    }
+    setErrorMessage(null);
+    setMfaLoading(true);
+
+    try {
+      if (!signIn) throw new Error("Authentication module is not loaded.");
+
+      const completeMFA = await signIn.attemptSecondFactor({
+        strategy: mfaStrategy as any,
+        code: mfaCode,
+      });
+
+      if (completeMFA.status === "complete") {
+        if (rememberMe) {
+          localStorage.setItem('nestlist_remembered_email', email);
+          localStorage.setItem('nestlist_remember_me', 'true');
+        } else {
+          localStorage.removeItem('nestlist_remembered_email');
+          localStorage.setItem('nestlist_remember_me', 'false');
+        }
+
+        await setActive({ session: completeMFA.createdSessionId });
+        triggerToast("Welcome back! Multi-Factor session secured.", "success");
+        navigate("/dashboard", { replace: true });
+      } else {
+        throw new Error(`Second factor verification incomplete. Status: ${completeMFA.status}`);
+      }
+    } catch (err: any) {
+      console.error("MFA authentication failure:", err);
+      setErrorMessage(mapClerkError(err));
+      triggerToast("Verification failed", "error");
+    } finally {
+      setMfaLoading(false);
     }
   };
 
@@ -797,6 +917,87 @@ export const Login: React.FC = () => {
                         </>
                       ) : (
                         <span>Verify and Submit</span>
+                      )}
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* ─────────────────────────────────────────
+                  VIEW: MULTI-FACTOR VERIFICATION
+                  ───────────────────────────────────────── */}
+              {activeView === 'mfa' && (
+                <motion.div
+                  key="mfa-view"
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={mfaLoading}
+                      onClick={() => {
+                        setActiveView('login');
+                        setErrorMessage(null);
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-bold outline-none disabled:opacity-50 text-left"
+                    >
+                      ← Return to sign in
+                    </button>
+                    
+                    <h2 className="text-2.5xl font-serif text-[#1e6b4a] font-normal leading-tight">
+                      Security Verification
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Multi-factor authentication is active on your account. Please enter the secure login verification code sent to your registered email or device.
+                    </p>
+                  </div>
+
+                  {errorMessage && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs leading-normal flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleMfaSubmit} className="space-y-5">
+                    <div>
+                      <label htmlFor="mfa-code" className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest font-mono mb-1.5">
+                        Verification Code (OTP)
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          id="mfa-code"
+                          type="text"
+                          required
+                          disabled={mfaLoading}
+                          value={mfaCode}
+                          onChange={(e) => setMfaCode(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-[#C9913A] focus:bg-white focus:ring-4 focus:ring-[#C9913A]/5 text-slate-800 text-sm rounded-xl pl-11 pr-4 py-3 h-12 outline-none disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={mfaLoading}
+                      className="w-full h-12 bg-[#1E6B4A] hover:bg-[#155238] text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {mfaLoading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          <span>Securing Session...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="w-4.5 h-4.5" />
+                          <span>Verify and Continue</span>
+                        </>
                       )}
                     </button>
                   </form>

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import GoogleDriveHub from './GoogleDriveHub';
 import { getApiUrl } from '../utils/apiHelper';
 import { motion, AnimatePresence } from 'motion/react';
 import emailjs from '@emailjs/browser';
@@ -1798,6 +1799,9 @@ export default function Dashboards({
               </div>
             </div>
           </div>
+
+          {/* GOOGLE DRIVE DOCUMENTS AND SYNCHRONIZER HUB */}
+          <GoogleDriveHub listings={listings} />
 
           {/* ============ SAVED FILTER MANAGEMENT SYSTEM ============ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
