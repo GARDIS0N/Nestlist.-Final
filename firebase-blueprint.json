@@ -1,0 +1,275 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "UserProfile representation including role, favorites, bio and phone.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the user (clerkId or custom ID)"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name or display name"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["Tenant", "Landlord", "Agent", "Admin"],
+          "description": "User's platform role"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact telephone number"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Base64 or external url profile picture"
+        },
+        "bio": {
+          "type": "string",
+          "description": "About me profile description"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Identity verification status"
+        },
+        "favorites": {
+          "type": "array",
+          "description": "List of favorite property listing IDs"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "email", "name", "role"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "Property listing parameters containing location details, pricing, and visual media.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Listing unique id"
+        },
+        "title": {
+          "type": "string",
+          "description": "Property listing title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Deep text description of the rental location"
+        },
+        "propertyType": {
+          "type": "string",
+          "description": "Type e.g. Apartment, Bedsitter, Townhouse"
+        },
+        "roleType": {
+          "type": "string",
+          "description": "Listing action (e.g. Rent, Sale)"
+        },
+        "location": {
+          "type": "object",
+          "description": "Geographical coordinate mapping and addresses"
+        },
+        "details": {
+          "type": "object",
+          "description": "Properties details (bedrooms, bathrooms, size)"
+        },
+        "pricing": {
+          "type": "object",
+          "description": "Billing models (price, currency, billing period)"
+        },
+        "media": {
+          "type": "object",
+          "description": "Images gallery urls or base 64 encodings"
+        },
+        "author": {
+          "type": "object",
+          "description": "Listing author profile details snapshot"
+        },
+        "isFeatured": {
+          "type": "boolean",
+          "description": "Featured flag"
+        },
+        "status": {
+          "type": "string",
+          "description": "Listing status: active, pending_payment, draft, inactive"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Listing expiry threshold"
+        },
+        "views": {
+          "type": "integer",
+          "description": "Count of property listing views"
+        },
+        "inquiriesCount": {
+          "type": "integer",
+          "description": "Count of listing client inquiries"
+        },
+        "savesCount": {
+          "type": "integer",
+          "description": "Count of users bookmarking the listing"
+        }
+      },
+      "required": ["id", "title", "propertyType", "roleType"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Safaricom M-Pesa billing logs and transactions tracking",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Payment ID"
+        },
+        "listingId": {
+          "type": "string",
+          "description": "Target listing property associated with fee"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction volume fee in KES"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency abbreviation (KES)"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Billing integration provider (mpesa)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Payment status: pending, completed, failed"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "M-Pesa payment telephone number"
+        },
+        "checkoutRequestID": {
+          "type": "string",
+          "description": "Daraja Checkout request parameter"
+        },
+        "mpesaReceiptNumber": {
+          "type": "string",
+          "description": "Safaricom payment transaction invoice"
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Internal tracking key"
+        },
+        "paymentTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "listingId", "amount", "status"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Interested client messages sent directly to agents/landlords.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "listingId": {
+          "type": "string"
+        },
+        "tenantId": {
+          "type": "string"
+        },
+        "tenantName": {
+          "type": "string"
+        },
+        "tenantEmail": {
+          "type": "string"
+        },
+        "tenantPhone": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "listingId", "tenantId", "message"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app alerts and notifications logs.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "isRead": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userId", "title", "message", "isRead"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Authorized client profiles"
+    },
+    "listings/{listingId}": {
+      "schema": "Listing",
+      "description": "Kenya real estate listings database"
+    },
+    "payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Billing transaction details directory"
+    },
+    "inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Tenants engagement requests"
+    },
+    "notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notification dispatcher database"
+    }
+  }
+}

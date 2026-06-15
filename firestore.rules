@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default catch-all security net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSystemAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'gardisonkirui11@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- 1. USERS COLLECTION ---
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSystemAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (
+        // Restrict client-side updates to safe fields to prevent privilege escalation
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'avatarUrl', 'bio', 'favorites'])
+      );
+      allow delete: if isSystemAdmin();
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email', 'name', 'role']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.role is string && (data.role == 'Tenant' || data.role == 'Landlord' || data.role == 'Agent' || data.role == 'Admin');
+    }
+
+    // --- 2. LISTINGS COLLECTION ---
+    match /listings/{listingId} {
+      allow read: if true; // Listings are public catalogs
+      allow create: if isVerifiedUser() &&
+                       isValidId(listingId) &&
+                       isValidListing(request.resource.data) &&
+                       request.resource.data.author.id == request.auth.uid;
+      allow update: if isVerifiedUser() &&
+                       isValidListing(request.resource.data) &&
+                       (request.resource.data.author.id == request.auth.uid || isSystemAdmin()) && (
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                           'title', 'description', 'propertyType', 'roleType', 'status',
+                           'location', 'details', 'pricing', 'media', 'views', 'savesCount', 'inquiriesCount'
+                         ])
+                       );
+      allow delete: if isVerifiedUser() && (resource.data.author.id == request.auth.uid || isSystemAdmin());
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll(['id', 'title', 'propertyType', 'roleType']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 250 &&
+             data.propertyType is string && data.propertyType.size() <= 100 &&
+             data.roleType is string && data.roleType.size() <= 100;
+    }
+
+    // --- 3. PAYMENTS COLLECTION ---
+    match /payments/{paymentId} {
+      // Payments can only be managed by administrators or read by the corresponding owner
+      allow read: if isSignedIn() && (
+        resource.data.phoneNumber == request.auth.token.phone_number ||
+        isSystemAdmin()
+      );
+      allow create: if isVerifiedUser() && isValidId(paymentId) && request.resource.data.amount > 0;
+      allow update: if isSystemAdmin();
+      allow delete: if isSystemAdmin();
+    }
+
+    // --- 4. INQUIRIES COLLECTION ---
+    match /inquiries/{inquiryId} {
+      allow read: if isSignedIn() && (
+        resource.data.tenantId == request.auth.uid ||
+        resource.data.tenantEmail == request.auth.token.email ||
+        isSystemAdmin()
+      );
+      allow create: if isVerifiedUser() &&
+                       isValidId(inquiryId) &&
+                       isValidInquiry(request.resource.data) &&
+                       request.resource.data.tenantId == request.auth.uid;
+      allow update: if isSystemAdmin();
+      allow delete: if isSystemAdmin();
+    }
+
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['id', 'listingId', 'tenantId', 'message']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.listingId is string && data.listingId.size() <= 128 &&
+             data.tenantId is string && data.tenantId.size() <= 128 &&
+             data.message is string && data.message.size() <= 5000;
+    }
+
+    // --- 5. NOTIFICATIONS COLLECTION ---
+    match /notifications/{notificationId} {
+      // Private messages/alerts
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSystemAdmin());
+      allow create: if isSystemAdmin() || (
+        isVerifiedUser() &&
+        isValidId(notificationId) &&
+        request.resource.data.userId != request.auth.uid // Cannot spam oneself
+      );
+      allow update: if isSignedIn() &&
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

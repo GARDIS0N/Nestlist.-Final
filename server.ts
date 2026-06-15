@@ -3,7 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import fs from "fs";
 import dotenv from "dotenv";
-import { isSupabaseActive, dbService } from "./supabase-service.js";
+import { isSupabaseActive, dbService } from "./unified-db-service.js";
 
 dotenv.config();
 
