@@ -1,5 +1,9 @@
 {
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/api/(.*)", "destination": "https://ais-pre-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app/api/$1" },
+    { "source": "/uploads/(.*)", "destination": "https://ais-pre-sfmibnnqnbsnb3cvrwir6j-158126767579.europe-west2.run.app/uploads/$1" },
+    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
+    { "source": "/((?!api|uploads|assets).*)", "destination": "/public/index.html" }
   ]
 }
