@@ -1,19 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  getDocFromServer,
-  increment
-} from "firebase/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore, Firestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
 import path from "path";
 
@@ -21,51 +7,37 @@ import path from "path";
 // INITIALIZATION
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Load config dynamically from root JSON configuration file to be ESM safe
 let isConfigured = false;
-let firebaseConfig: any = null;
-let app: any = null;
-let db: any = null;
+let db: Firestore | null = null;
 
 try {
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
   if (fs.existsSync(configPath)) {
     const raw = fs.readFileSync(configPath, "utf-8");
-    firebaseConfig = JSON.parse(raw);
-    if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {
+    const firebaseConfig = JSON.parse(raw);
+    if (firebaseConfig && firebaseConfig.projectId) {
+      if (getApps().length === 0) {
+        initializeApp({
+          projectId: firebaseConfig.projectId
+        });
+      }
+      
+      if (firebaseConfig.firestoreDatabaseId) {
+        try {
+          db = getFirestore(getApps()[0]!, firebaseConfig.firestoreDatabaseId);
+        } catch (e) {
+          db = getFirestore(getApps()[0]!);
+        }
+      } else {
+        db = getFirestore(getApps()[0]!);
+      }
+      
       isConfigured = true;
+      console.log("⚡ Firebase Admin SDK initialized successfully with Database ID:", firebaseConfig.firestoreDatabaseId);
     }
   }
 } catch (err) {
-  console.warn("⚠️ Failed to parse firebase-applet-config.json:", err);
-}
-
-if (isConfigured && firebaseConfig) {
-  try {
-    app = initializeApp(firebaseConfig);
-    // Explicitly pass databaseId to prevent breaking changes on multi-database setups
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    console.log("⚡ Firebase client initialized with Firestore Database ID:", firebaseConfig.firestoreDatabaseId);
-
-    // Validate connection to Firestore on initialization
-    (async () => {
-      try {
-        await getDocFromServer(doc(db, "test", "connection"));
-        console.log("⚡ Firebase connected successfully!");
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("offline")) {
-          console.error("Please check your Firebase configuration of the server.");
-        } else {
-          console.log("⚡ Connection validation skipped (unseeded 'test/connection' is normal during provisioning).");
-        }
-      }
-    })();
-  } catch (err) {
-    console.warn("⚠️ Failed to initialize Firebase:", err);
-    isConfigured = false;
-  }
-} else {
-  console.warn("ℹ️ Firebase configuration parameters not set. Skipping engine activation.");
+  console.warn("⚠️ Failed to initialize Firebase Admin SDK:", err);
 }
 
 export function isFirebaseActive(): boolean {
@@ -121,7 +93,7 @@ function handleFirestoreError(
     operationType,
     path
   };
-  console.error("Firestore Exception Catch:", JSON.stringify(errInfo));
+  console.error("Firestore Admin Exception Catch:", JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -132,13 +104,12 @@ function handleFirestoreError(
 export const firebaseDbService = {
   // --- USERS ---
   async getUsers(activeUser?: any): Promise<any[]> {
-    if (!isFirebaseActive()) return [];
+    if (!isFirebaseActive() || !db) return [];
     const pathName = "users";
     try {
-      const q = query(collection(db, pathName));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await db.collection(pathName).get();
       const list: any[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         list.push(docSnap.data());
       });
       return list;
@@ -148,10 +119,9 @@ export const firebaseDbService = {
   },
 
   async createUser(user: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `users/${user.id}`;
     try {
-      // Store clean, direct fields. Arrays stay arrays. No JSON parsing needed.
       const payload = {
         id: user.id || "",
         email: (user.email || "").toLowerCase().trim(),
@@ -164,7 +134,7 @@ export const firebaseDbService = {
         favorites: Array.isArray(user.favorites) ? user.favorites : [],
         createdAt: user.createdAt || new Date().toISOString()
       };
-      await setDoc(doc(db, "users", user.id), payload);
+      await db.collection("users").doc(user.id).set(payload);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, pathName, activeUser);
@@ -172,7 +142,7 @@ export const firebaseDbService = {
   },
 
   async updateUser(userId: string, updates: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `users/${userId}`;
     try {
       const mapped: any = {};
@@ -185,7 +155,7 @@ export const firebaseDbService = {
         mapped.favorites = Array.isArray(updates.favorites) ? updates.favorites : [];
       }
 
-      await updateDoc(doc(db, "users", userId), mapped);
+      await db.collection("users").doc(userId).update(mapped);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
@@ -193,10 +163,10 @@ export const firebaseDbService = {
   },
 
   async updateUserFavorites(userId: string, favorites: string[], activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `users/${userId}`;
     try {
-      await updateDoc(doc(db, "users", userId), {
+      await db.collection("users").doc(userId).update({
         favorites: Array.isArray(favorites) ? favorites : []
       });
       return true;
@@ -207,13 +177,12 @@ export const firebaseDbService = {
 
   // --- LISTINGS ---
   async getListings(activeUser?: any): Promise<any[]> {
-    if (!isFirebaseActive()) return [];
+    if (!isFirebaseActive() || !db) return [];
     const pathName = "listings";
     try {
-      const q = query(collection(db, pathName), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await db.collection(pathName).orderBy("createdAt", "desc").get();
       const list: any[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         list.push(docSnap.data());
       });
       return list;
@@ -223,7 +192,7 @@ export const firebaseDbService = {
   },
 
   async createListing(listing: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `listings/${listing.id}`;
     try {
       const payload = {
@@ -245,7 +214,7 @@ export const firebaseDbService = {
         inquiriesCount: listing.inquiriesCount || 0,
         savesCount: listing.savesCount || 0
       };
-      await setDoc(doc(db, "listings", listing.id), payload);
+      await db.collection("listings").doc(listing.id).set(payload);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, pathName, activeUser);
@@ -253,7 +222,7 @@ export const firebaseDbService = {
   },
 
   async updateListing(id: string, listingUpdate: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `listings/${id}`;
     try {
       const updates: any = {};
@@ -273,7 +242,7 @@ export const firebaseDbService = {
       if (listingUpdate.inquiriesCount !== undefined) updates.inquiriesCount = listingUpdate.inquiriesCount;
       if (listingUpdate.savesCount !== undefined) updates.savesCount = listingUpdate.savesCount;
 
-      await updateDoc(doc(db, "listings", id), updates);
+      await db.collection("listings").doc(id).update(updates);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
@@ -281,10 +250,10 @@ export const firebaseDbService = {
   },
 
   async deleteListing(id: string, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `listings/${id}`;
     try {
-      await deleteDoc(doc(db, "listings", id));
+      await db.collection("listings").doc(id).delete();
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, pathName, activeUser);
@@ -292,14 +261,14 @@ export const firebaseDbService = {
   },
 
   async incrementListingViews(id: string, activeUser?: any): Promise<number> {
-    if (!isFirebaseActive()) return 0;
+    if (!isFirebaseActive() || !db) return 0;
     const pathName = `listings/${id}`;
     try {
-      await updateDoc(doc(db, "listings", id), {
-        views: increment(1)
+      await db.collection("listings").doc(id).update({
+        views: FieldValue.increment(1)
       });
       // Retrieve the updated count
-      const docSnap = await getDoc(doc(db, "listings", id));
+      const docSnap = await db.collection("listings").doc(id).get();
       return docSnap.data()?.views || 1;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
@@ -307,10 +276,10 @@ export const firebaseDbService = {
   },
 
   async updateListingSaves(id: string, savesCount: number, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `listings/${id}`;
     try {
-      await updateDoc(doc(db, "listings", id), { savesCount: savesCount });
+      await db.collection("listings").doc(id).update({ savesCount: savesCount });
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
@@ -319,13 +288,12 @@ export const firebaseDbService = {
 
   // --- PAYMENTS ---
   async getPayments(activeUser?: any): Promise<any[]> {
-    if (!isFirebaseActive()) return [];
+    if (!isFirebaseActive() || !db) return [];
     const pathName = "payments";
     try {
-      const q = query(collection(db, pathName));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await db.collection(pathName).get();
       const list: any[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         list.push(docSnap.data());
       });
       return list;
@@ -335,7 +303,7 @@ export const firebaseDbService = {
   },
 
   async createPayment(pay: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `payments/${pay.id}`;
     try {
       const payload = {
@@ -353,7 +321,7 @@ export const firebaseDbService = {
         createdAt: pay.createdAt || new Date().toISOString(),
         updatedAt: pay.updatedAt || new Date().toISOString()
       };
-      await setDoc(doc(db, "payments", pay.id), payload);
+      await db.collection("payments").doc(pay.id).set(payload);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, pathName, activeUser);
@@ -361,7 +329,7 @@ export const firebaseDbService = {
   },
 
   async updatePayment(id: string, updates: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `payments/${id}`;
     try {
       const dbUpdates: any = {};
@@ -373,7 +341,7 @@ export const firebaseDbService = {
       if (updates.paymentTimestamp !== undefined) dbUpdates.paymentTimestamp = updates.paymentTimestamp;
       dbUpdates.updatedAt = new Date().toISOString();
 
-      await updateDoc(doc(db, "payments", id), dbUpdates);
+      await db.collection("payments").doc(id).update(dbUpdates);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
@@ -382,13 +350,12 @@ export const firebaseDbService = {
 
   // --- INQUIRIES ---
   async getInquiries(activeUser?: any): Promise<any[]> {
-    if (!isFirebaseActive()) return [];
+    if (!isFirebaseActive() || !db) return [];
     const pathName = "inquiries";
     try {
-      const q = query(collection(db, pathName));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await db.collection(pathName).get();
       const list: any[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         list.push(docSnap.data());
       });
       return list;
@@ -398,7 +365,7 @@ export const firebaseDbService = {
   },
 
   async createInquiry(inq: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `inquiries/${inq.id}`;
     try {
       const payload = {
@@ -411,7 +378,7 @@ export const firebaseDbService = {
         message: inq.message || "",
         createdAt: inq.createdAt || new Date().toISOString()
       };
-      await setDoc(doc(db, "inquiries", inq.id), payload);
+      await db.collection("inquiries").doc(inq.id).set(payload);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, pathName, activeUser);
@@ -420,13 +387,12 @@ export const firebaseDbService = {
 
   // --- NOTIFICATIONS ---
   async getNotifications(activeUser?: any): Promise<any[]> {
-    if (!isFirebaseActive()) return [];
+    if (!isFirebaseActive() || !db) return [];
     const pathName = "notifications";
     try {
-      const q = query(collection(db, pathName), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
+      const snapshot = await db.collection(pathName).orderBy("createdAt", "desc").get();
       const list: any[] = [];
-      querySnapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap) => {
         list.push(docSnap.data());
       });
       return list;
@@ -436,7 +402,7 @@ export const firebaseDbService = {
   },
 
   async createNotification(not: any, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = `notifications/${not.id}`;
     try {
       const payload = {
@@ -447,7 +413,7 @@ export const firebaseDbService = {
         isRead: not.isRead || false,
         createdAt: not.createdAt || new Date().toISOString()
       };
-      await setDoc(doc(db, "notifications", not.id), payload);
+      await db.collection("notifications").doc(not.id).set(payload);
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, pathName, activeUser);
@@ -455,23 +421,20 @@ export const firebaseDbService = {
   },
 
   async markNotificationsAsRead(userId: string, activeUser?: any): Promise<boolean> {
-    if (!isFirebaseActive()) return false;
+    if (!isFirebaseActive() || !db) return false;
     const pathName = "notifications";
     try {
-      // Fetch user's unread notifications and update them sequentially (client SDK ESM clean update batch style)
-      const q = query(
-        collection(db, pathName), 
-        where("userId", "==", userId), 
-        where("isRead", "==", false)
-      );
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await db.collection(pathName)
+        .where("userId", "==", userId)
+        .where("isRead", "==", false)
+        .get();
       
-      const promises: Promise<void>[] = [];
+      const batch = db.batch();
       querySnapshot.forEach((docSnap) => {
-        promises.push(updateDoc(doc(db, "notifications", docSnap.id), { isRead: true }));
+        batch.update(docSnap.ref, { isRead: true });
       });
       
-      await Promise.all(promises);
+      await batch.commit();
       return true;
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, pathName, activeUser);
